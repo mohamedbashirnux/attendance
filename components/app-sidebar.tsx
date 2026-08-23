@@ -31,7 +31,7 @@ const data = {
     {
       title: "Setting",
       items: [
-        { title: "Add User", url: "#" },
+        { title: "Add User", url: "/super_admin/faculty_users" },
         { title: "Add Admin", url: "#" },
       ],
     },
