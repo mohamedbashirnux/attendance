@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model absences {
+  id               Int              @id @default(autoincrement())
+  student_id       Int
+  class_id         Int
+  subject_class_id Int
+  teacher_id       Int
+  absence_date     DateTime         @db.Date
+  excuse           absences_excuse? @default(No_Excuse)
+  created_at       DateTime         @default(now()) @db.Timestamp(0)
+  updated_at       DateTime         @default(now()) @db.Timestamp(0)
+  students         students         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_1")
+  classes          classes          @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_2")
+  teachers         teachers         @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_3")
+
+  @@unique([student_id, class_id, subject_class_id, absence_date], map: "unique_absence")
+  @@index([class_id, absence_date], map: "idx_class_date")
+  @@index([student_id, absence_date], map: "idx_student_date")
+  @@index([teacher_id, absence_date], map: "idx_teacher_date")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model app_feedback {
+  id            Int                    @id @default(autoincrement())
+  user_id       String                 @db.VarChar(20)
+  user_type     app_feedback_user_type @default(student)
+  rating        Int
+  feedback_type String?                @db.VarChar(50)
+  feedback      String                 @db.Text
+  status        app_feedback_status    @default(pending)
+  admin_notes   String?                @db.Text
+  submitted_at  DateTime               @default(now()) @db.Timestamp(0)
+
+  @@index([status], map: "status")
+  @@index([submitted_at], map: "submitted_at")
+  @@index([user_id], map: "user_id")
+  @@index([user_type], map: "user_type")
+}
+
+model attendance_sessions {
+  id                    Int      @id @default(autoincrement())
+  class_id              Int
+  subject_class_id      Int
+  teacher_id            Int
+  session_datetime      DateTime @db.DateTime(0)
+  total_students        Int      @default(0)
+  absent_students       Int      @default(0)
+  present_students      Int      @default(0)
+  attendance_percentage Decimal? @default(0.00) @db.Decimal(5, 2)
+  notes                 String?  @db.Text
+  created_at            DateTime @default(now()) @db.Timestamp(0)
+  updated_at            DateTime @default(now()) @db.Timestamp(0)
+  classes               classes  @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_1")
+  teachers              teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_2")
+
+  @@index([class_id, subject_class_id, session_datetime], map: "idx_class_subject_datetime")
+  @@index([session_datetime], map: "idx_session_datetime")
+  @@index([teacher_id, session_datetime], map: "idx_teacher_datetime")
+}
+
+model classes {
+  id                         Int                          @id @default(autoincrement())
+  faculty_id                 Int
+  department_id              Int
+  class_name                 String                       @db.VarChar(50)
+  study_mode                 classes_study_mode
+  semester                   classes_semester
+  academic_year              String                       @db.VarChar(9)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  absences                   absences[]
+  attendance_sessions        attendance_sessions[]
+  faculty                    faculty                      @relation(fields: [faculty_id], references: [id], onDelete: Cascade, map: "classes_ibfk_1")
+  departments                departments                  @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "classes_ibfk_2")
+  lesson_materials           lesson_materials[]
+  notification_logs          notification_logs[]
+  students                   students[]
+  subject_class              subject_class[]
+  teacher_subject_allocation teacher_subject_allocation[]
+  timetable                  timetable[]
+
+  @@index([department_id], map: "department_id")
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model departments {
+  id              Int        @id @default(autoincrement())
+  faculty_id      Int
+  department_name String     @db.VarChar(100)
+  classes         classes[]
+  faculty         faculty    @relation(fields: [faculty_id], references: [id], onDelete: Cascade, map: "departments_ibfk_1")
+  subjects        subjects[]
+
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model device_tokens {
+  id           Int      @id @default(autoincrement())
+  student_id   String   @db.VarChar(20)
+  device_token String   @db.Text
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  updated_at   DateTime @default(now()) @db.Timestamp(0)
+  students     students @relation(fields: [student_id], references: [student_id], onDelete: Cascade, map: "device_tokens_ibfk_1")
+
+  @@unique([student_id, device_token(length: 255)], map: "unique_student_token")
+  @@index([student_id], map: "student_id")
+}
+
+model faculty {
+  id            Int             @id @default(autoincrement())
+  faculty_name  String          @db.VarChar(100)
+  created_at    DateTime        @default(now()) @db.Timestamp(0)
+  classes       classes[]
+  departments   departments[]
+  faculty_users faculty_users[]
+  subject_class subject_class[]
+  subjects      subjects[]
+  teachers      teachers[]
+}
+
+model faculty_users {
+  id         Int      @id @default(autoincrement())
+  faculty_id Int
+  username   String   @unique(map: "username") @db.VarChar(50)
+  password   String   @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  faculty    faculty  @relation(fields: [faculty_id], references: [id], onDelete: Cascade, map: "faculty_users_ibfk_1")
+
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model lesson_materials {
+  id          Int                      @id @default(autoincrement())
+  teacher_id  Int
+  class_id    Int
+  subject_id  Int
+  title       String                   @db.VarChar(255)
+  description String?                  @db.Text
+  file_path   String                   @db.VarChar(500)
+  file_name   String                   @db.VarChar(255)
+  file_size   Int?
+  upload_date DateTime                 @default(now()) @db.Timestamp(0)
+  status      lesson_materials_status? @default(active)
+  classes     classes                  @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "fk_lesson_class")
+  subjects    subjects                 @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "fk_lesson_subject")
+  teachers    teachers                 @relation(fields: [teacher_id], references: [id], onDelete: Cascade, map: "fk_lesson_teacher")
+
+  @@index([class_id], map: "idx_class_id")
+  @@index([status], map: "idx_status")
+  @@index([subject_id], map: "idx_subject_id")
+  @@index([teacher_id], map: "idx_teacher_id")
+}
+
+model notification_logs {
+  id           Int      @id @default(autoincrement())
+  class_id     Int
+  title        String   @db.VarChar(255)
+  message      String   @db.Text
+  sent_count   Int?     @default(0)
+  failed_count Int?     @default(0)
+  sent_at      DateTime @default(now()) @db.Timestamp(0)
+  classes      classes  @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "fk_notification_class")
+
+  @@index([class_id], map: "idx_class_id")
+  @@index([sent_at], map: "idx_sent_at")
+}
+
+model students {
+  id            Int              @id @default(autoincrement())
+  student_id    String           @unique(map: "student_id") @db.VarChar(20)
+  class_id      Int
+  full_name     String           @db.VarChar(100)
+  phone         String?          @db.VarChar(20)
+  password      String           @db.VarChar(255)
+  status        students_status? @default(approved)
+  created_at    DateTime         @default(now()) @db.Timestamp(0)
+  absences      absences[]
+  device_tokens device_tokens[]
+  classes       classes          @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "students_ibfk_1")
+
+  @@index([class_id], map: "class_id")
+}
+
+model subject_class {
+  id         Int      @id @default(autoincrement())
+  faculty_id Int
+  subject_id Int
+  class_id   Int
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  faculty    faculty  @relation(fields: [faculty_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_1")
+  subjects   subjects @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_2")
+  classes    classes  @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_3")
+
+  @@unique([subject_id, class_id], map: "subject_id")
+  @@index([class_id], map: "class_id")
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model subjects {
+  id                         Int                          @id @default(autoincrement())
+  faculty_id                 Int
+  department_id              Int
+  subject_name               String                       @db.VarChar(100)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  lesson_materials           lesson_materials[]
+  subject_class              subject_class[]
+  faculty                    faculty                      @relation(fields: [faculty_id], references: [id], onDelete: Cascade, map: "subjects_ibfk_1")
+  departments                departments                  @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "subjects_ibfk_2")
+  teacher_subject_allocation teacher_subject_allocation[]
+
+  @@index([department_id], map: "department_id")
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model super_admin {
+  id         Int      @id @default(autoincrement())
+  full_name  String   @db.VarChar(100)
+  username   String   @unique(map: "username") @db.VarChar(50)
+  password   String   @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+}
+
+model teacher_subject_allocation {
+  id         Int                                @id @default(autoincrement())
+  teacher_id Int
+  class_id   Int
+  subject_id Int
+  start_time DateTime                           @db.Time(0)
+  end_time   DateTime                           @db.Time(0)
+  status     teacher_subject_allocation_status? @default(pending)
+  created_at DateTime                           @default(now()) @db.Timestamp(0)
+  updated_at DateTime                           @default(now()) @db.Timestamp(0)
+  teachers   teachers                           @relation(fields: [teacher_id], references: [id], onDelete: Cascade, map: "teacher_allocation_teacher_fk")
+  classes    classes                            @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "teacher_subject_allocation_ibfk_2")
+  subjects   subjects                           @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "teacher_subject_allocation_ibfk_3")
+  timetable  timetable[]
+
+  @@unique([teacher_id, class_id, subject_id, start_time], map: "unique_allocation")
+  @@index([class_id], map: "class_id")
+  @@index([subject_id], map: "subject_id")
+}
+
+model teachers {
+  id                         Int                          @id @default(autoincrement())
+  teacher_id                 String                       @unique(map: "teacher_id") @db.VarChar(50)
+  faculty_id                 Int
+  full_name                  String                       @db.VarChar(255)
+  username                   String                       @unique(map: "username") @db.VarChar(100)
+  password                   String                       @db.VarChar(255)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  absences                   absences[]
+  attendance_sessions        attendance_sessions[]
+  lesson_materials           lesson_materials[]
+  teacher_subject_allocation teacher_subject_allocation[]
+  faculty                    faculty                      @relation(fields: [faculty_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "teachers_ibfk_1")
+
+  @@index([faculty_id], map: "faculty_id")
+}
+
+model timetable {
+  id                         Int                        @id @default(autoincrement())
+  class_id                   Int
+  allocation_id              Int
+  day_of_week                String                     @db.VarChar(20)
+  time_start                 DateTime                   @db.Time(0)
+  time_end                   DateTime                   @db.Time(0)
+  location_hall              String?                    @db.VarChar(100)
+  created_at                 DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime                   @default(now()) @db.Timestamp(0)
+  teacher_subject_allocation teacher_subject_allocation @relation(fields: [allocation_id], references: [id], onDelete: Cascade, map: "fk_timetable_allocation")
+  classes                    classes                    @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "fk_timetable_class")
+
+  @@index([allocation_id], map: "idx_allocation_id")
+  @@index([class_id], map: "idx_class_id")
+  @@index([day_of_week], map: "idx_day_of_week")
+}
+
+enum app_feedback_user_type {
+  student
+  teacher
+}
+
+enum classes_study_mode {
+  Full_Time_Morning   @map("Full Time Morning")
+  Full_Time_Afternoon @map("Full Time Afternoon")
+  Full_Time_Evening   @map("Full Time Evening")
+  Weekend
+}
+
+enum classes_semester {
+  Semester_1   @map("Semester 1")
+  Semester_2   @map("Semester 2")
+  Semester_3   @map("Semester 3")
+  Semester_4   @map("Semester 4")
+  Semester_5   @map("Semester 5")
+  Semester_6   @map("Semester 6")
+  Semester_7   @map("Semester 7")
+  Semester_8   @map("Semester 8")
+  Semester_9   @map("Semester 9")
+  Semester_10  @map("Semester 10")
+  Semester_11  @map("Semester 11")
+  Semester_12  @map("Semester 12")
+  Semester_101 @map("Semester 101")
+  Semester_102 @map("Semester 102")
+}
+
+enum absences_excuse {
+  Family_Emergency    @map("Family Emergency")
+  Medical_Appointment @map("Medical Appointment")
+  Personal_Reason     @map("Personal Reason")
+  Official_Duty       @map("Official Duty")
+  Other
+  No_Excuse           @map("No Excuse")
+}
+
+enum app_feedback_status {
+  pending
+  under_review
+  implemented
+  rejected
+}
+
+enum students_status {
+  pending
+  approved
+}
+
+enum teacher_subject_allocation_status {
+  pending
+  waiting
+  approved
+}
+
+enum lesson_materials_status {
+  active
+  archived
+}
