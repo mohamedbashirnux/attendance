@@ -32,7 +32,7 @@ const data = {
       title: "Setting",
       items: [
         { title: "Add User", url: "/super_admin/faculty_users" },
-        { title: "Add Admin", url: "#" },
+        { title: "Add Admin", url: "/super_admin/super_admin" },
       ],
     },
   ],
