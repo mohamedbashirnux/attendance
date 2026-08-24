@@ -15,6 +15,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { FacultyUsersTable } from "./faculty-users-table"
 import type { FacultyUserRow } from "@/lib/backend_super_admin/faculty_users/fetch"
 import type { FacultyRow } from "@/lib/types"
@@ -34,6 +41,7 @@ export function FacultyUsersManager({
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<FacultyUserRow | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [facultyId, setFacultyId] = React.useState<string>("")
 
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleting, setDeleting] = React.useState<FacultyUserRow | null>(null)
@@ -41,12 +49,14 @@ export function FacultyUsersManager({
   function openAdd() {
     setEditing(null)
     setError(null)
+    setFacultyId("")
     setFormOpen(true)
   }
 
   function openEdit(row: FacultyUserRow) {
     setEditing(row)
     setError(null)
+    setFacultyId(String(row.faculty_id))
     setFormOpen(true)
   }
 
@@ -109,21 +119,22 @@ export function FacultyUsersManager({
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="faculty_id">Faculty</Label>
-              <select
-                id="faculty_id"
-                name="faculty_id"
-                defaultValue={editing?.faculty_id ?? ""}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <Select
+                value={facultyId || undefined}
+                onValueChange={(v) => setFacultyId(v ?? "")}
               >
-                <option value="" disabled>
-                  Select faculty
-                </option>
-                {faculties.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.faculty_name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="faculty_id" className="w-full">
+                  <SelectValue placeholder="Select faculty" />
+                </SelectTrigger>
+                <SelectContent>
+                  {faculties.map((f) => (
+                    <SelectItem key={f.id} value={String(f.id)}>
+                      {f.faculty_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" name="faculty_id" value={facultyId} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="username">Username</Label>
