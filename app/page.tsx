@@ -1,28 +1,55 @@
 import Link from "next/link"
-import { GraduationCap } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { UserRound, ShieldCheck } from "lucide-react"
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export default function Page() {
   return (
     <div className="flex min-h-svh w-full items-center justify-center bg-muted/30 p-6">
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-[#5F61E6] text-white">
-            <GraduationCap className="size-6" />
-          </div>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/images/logo1.png"
+            alt="Logo"
+            className="mb-3 size-14 rounded-xl object-contain"
+          />
           <h1 className="text-2xl font-semibold">Attendance</h1>
           <p className="text-sm text-muted-foreground">
             Select how you want to log in
           </p>
         </div>
+
         <div className="grid gap-3">
-          <Link href="/login" className="block">
-            <Button className="h-12 w-full text-base">Login as Admin</Button>
+          <Link href="/faculty/login" className="group block">
+            <Card className="cursor-pointer transition-all hover:-translate-y-0.5 hover:border-[#5F61E6] hover:bg-[#5F61E6]/5 hover:shadow-md">
+              <CardHeader className="flex-row items-center gap-3 space-y-0">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-[#5F61E6]/10 text-[#5F61E6]">
+                  <UserRound className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Login as User</CardTitle>
+                  <CardDescription>Faculty member access</CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
           </Link>
-          <Link href="/faculty/login" className="block">
-            <Button variant="outline" className="h-12 w-full text-base">
-              Login as User
-            </Button>
+
+          <Link href="/login" className="group block">
+            <Card className="cursor-pointer transition-all hover:-translate-y-0.5 hover:border-[#5F61E6] hover:bg-[#5F61E6]/5 hover:shadow-md">
+              <CardHeader className="flex-row items-center gap-3 space-y-0">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-[#5F61E6]/10 text-[#5F61E6]">
+                  <ShieldCheck className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Login as Admin</CardTitle>
+                  <CardDescription>Super admin access</CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
           </Link>
         </div>
       </div>
