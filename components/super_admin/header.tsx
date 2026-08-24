@@ -1,5 +1,6 @@
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
+import { UserRound } from "lucide-react"
 
 export function SuperAdminHeader({ name }: { name: string }) {
   return (
@@ -10,7 +11,12 @@ export function SuperAdminHeader({ name }: { name: string }) {
         className="mr-2 data-vertical:h-4 data-vertical:self-auto"
       />
       <div className="font-medium">Super Admin</div>
-      <div className="ml-auto text-sm text-muted-foreground">{name}</div>
+      <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex size-7 items-center justify-center rounded-full bg-[#5F61E6]/10 text-[#5F61E6]">
+          <UserRound className="size-4" />
+        </div>
+        <span>{name}</span>
+      </div>
     </header>
   )
 }
