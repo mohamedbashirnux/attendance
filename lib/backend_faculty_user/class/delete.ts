@@ -10,7 +10,7 @@ export async function deleteClass(id: number) {
   if (!facultyId) return { error: "Not authenticated" }
 
   try {
-    await prisma.classes.delete({ where: { id, faculty_id: facultyId } })
+    await prisma.classes.delete({ where: { id } })
   } catch {
     return { error: "Cannot delete class (it has related students or records)" }
   }
