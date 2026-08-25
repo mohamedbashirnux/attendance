@@ -7,6 +7,11 @@ import {
   LayoutDashboard,
   Building2,
   School,
+  BookOpen,
+  Layers,
+  UserPlus,
+  BookUser,
+  CalendarOff,
 } from "lucide-react"
 import {
   Collapsible,
@@ -33,6 +38,21 @@ const navMain = [
     items: [
       { title: "Department", url: "/faculty_user/department", icon: Building2 },
       { title: "Class", url: "/faculty_user/class", icon: School },
+      { title: "Subject", url: "/faculty_user/subject", icon: BookOpen },
+      { title: "Subject Class", url: "/faculty_user/subject-class/selection", icon: Layers },
+    ],
+  },
+  {
+    title: "Teacher",
+    items: [
+      { title: "Add Teacher", url: "/faculty_user/teacher", icon: UserPlus },
+      { title: "Allocate Teacher Subjects", url: "/faculty_user/teacher-allocation/selection", icon: BookUser },
+    ],
+  },
+  {
+    title: "Manage Absents",
+    items: [
+      { title: "Absents", url: "/faculty_user/absents/selection", icon: CalendarOff },
     ],
   },
 ]

@@ -3,9 +3,9 @@
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
+import { auth } from "@/lib/backend_super_admin/auth/auth"
 
 const schema = z.object({
-  faculty_id: z.coerce.number().int().positive("Select a faculty"),
   department_name: z
     .string()
     .trim()
@@ -14,8 +14,11 @@ const schema = z.object({
 })
 
 export async function updateDepartment(id: number, formData: FormData) {
+  const session = await auth()
+  const facultyId = (session?.user as any)?.faculty_id as number | undefined
+  if (!facultyId) return { error: "Not authenticated" }
+
   const parsed = schema.safeParse({
-    faculty_id: formData.get("faculty_id"),
     department_name: formData.get("department_name"),
   })
   if (!parsed.success) {
@@ -24,11 +27,8 @@ export async function updateDepartment(id: number, formData: FormData) {
 
   try {
     await prisma.departments.update({
-      where: { id },
-      data: {
-        faculty_id: parsed.data.faculty_id,
-        department_name: parsed.data.department_name,
-      },
+      where: { id, faculty_id: facultyId },
+      data: { department_name: parsed.data.department_name },
     })
   } catch {
     return { error: "Could not update department" }

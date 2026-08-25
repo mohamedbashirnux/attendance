@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import {
   ChevronRight,
   LayoutDashboard,
-  GraduationCap,
   Building2,
   Users,
   ShieldCheck,
@@ -56,20 +55,12 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              render={<a href="/super_admin" />}
-              className="hover:bg-transparent"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-[#5F61E6] text-white">
-                <GraduationCap className="size-5" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Attendance</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Admin Panel
-                </span>
-              </div>
+            <SidebarMenuButton size="lg" render={<a href="/super_admin" />}>
+              <img
+                src="/images/logo1.png"
+                alt="Logo"
+                className="size-8 rounded-lg object-contain"
+              />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

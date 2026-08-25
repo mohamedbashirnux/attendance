@@ -6,36 +6,32 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/backend_super_admin/auth/auth"
 
 const schema = z.object({
-  department_name: z
-    .string()
-    .trim()
-    .min(1, "Department name is required")
-    .max(100),
+  department_id: z.coerce.number().int().positive("Select a department"),
+  subject_name: z.string().trim().min(1, "Subject name is required").max(100),
 })
 
-export async function createDepartment(formData: FormData) {
+export async function updateSubject(id: number, formData: FormData) {
   const session = await auth()
   const facultyId = (session?.user as any)?.faculty_id as number | undefined
   if (!facultyId) return { error: "Not authenticated" }
 
   const parsed = schema.safeParse({
-    department_name: formData.get("department_name"),
+    department_id: formData.get("department_id"),
+    subject_name: formData.get("subject_name"),
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" }
   }
 
   try {
-    await prisma.departments.create({
-      data: {
-        faculty_id: facultyId,
-        department_name: parsed.data.department_name,
-      },
+    await prisma.subjects.update({
+      where: { id, faculty_id: facultyId },
+      data: { ...parsed.data },
     })
   } catch {
-    return { error: "Could not create department" }
+    return { error: "Could not update subject" }
   }
 
-  revalidatePath("/faculty_user/department")
+  revalidatePath("/faculty_user/subject")
   return { ok: true as const }
 }
