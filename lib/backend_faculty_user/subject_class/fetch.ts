@@ -35,7 +35,7 @@ export async function getSubjectClassData(): Promise<SubjectClassData> {
       orderBy: { id: "asc" },
     }),
     prisma.classes.findMany({
-      where: { faculty_id: facultyId },
+      where: { departments: { faculty_id: facultyId } },
       select: {
         id: true,
         department_id: true,
@@ -46,12 +46,12 @@ export async function getSubjectClassData(): Promise<SubjectClassData> {
       orderBy: { id: "asc" },
     }),
     prisma.subjects.findMany({
-      where: { faculty_id: facultyId },
+      where: { departments: { faculty_id: facultyId } },
       select: { id: true, department_id: true, subject_name: true },
       orderBy: { id: "asc" },
     }),
     prisma.subject_class.findMany({
-      where: { faculty_id: facultyId },
+      where: { classes: { departments: { faculty_id: facultyId } } },
       select: { class_id: true, subject_id: true },
     }),
   ])
