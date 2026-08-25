@@ -25,11 +25,19 @@ export async function createAllocation(formData: FormData) {
   }
 
   try {
+    const sc = await prisma.subject_class.findFirst({
+      where: {
+        class_id: parsed.data.class_id,
+        subject_id: parsed.data.subject_id,
+      },
+      select: { id: true },
+    })
+    if (!sc) return { error: "Subject is not assigned to the selected class" }
+
     await prisma.teacher_subject_allocation.create({
       data: {
         teacher_id: parsed.data.teacher_id,
-        class_id: parsed.data.class_id,
-        subject_id: parsed.data.subject_id,
+        subject_class_id: sc.id,
         start_time: new Date(`1970-01-01T${parsed.data.start_time}:00`),
         end_time: new Date(`1970-01-01T${parsed.data.end_time}:00`),
       },
