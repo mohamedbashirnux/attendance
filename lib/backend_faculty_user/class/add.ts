@@ -59,7 +59,7 @@ export async function createClass(formData: FormData) {
 
   try {
     await prisma.classes.create({
-      data: { faculty_id: facultyId, ...parsed.data },
+      data: { ...parsed.data },
     })
   } catch {
     return { error: "Could not create class" }
