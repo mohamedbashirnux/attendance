@@ -10,7 +10,7 @@ export default async function FacultyUserLayout({
   children: React.ReactNode
 }) {
   const session = await auth()
-  const name = session?.user?.name ?? "Faculty"
+  const name = (session?.user as any)?.faculty_name ?? "Faculty"
 
   return (
     <SidebarProvider>
