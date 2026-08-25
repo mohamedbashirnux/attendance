@@ -32,7 +32,6 @@ export function ClassTable({
   const columns = React.useMemo(
     (): ColumnDef<TableFeatures, ClassRow, any>[] => [
       helper.accessor("id", { header: "ID" }),
-      helper.accessor("faculty_name", { header: "Faculty" }),
       helper.accessor("department_name", { header: "Department" }),
       helper.accessor("class_name", { header: "Class" }),
       helper.accessor("study_mode", {
