@@ -10,7 +10,7 @@ export async function deleteSubject(id: number) {
   if (!facultyId) return { error: "Not authenticated" }
 
   try {
-    await prisma.subjects.delete({ where: { id, faculty_id: facultyId } })
+    await prisma.subjects.delete({ where: { id } })
   } catch {
     return { error: "Cannot delete subject (it has related classes or allocations)" }
   }
