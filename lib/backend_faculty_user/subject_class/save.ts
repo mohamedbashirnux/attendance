@@ -9,13 +9,13 @@ export async function saveSubjectClass(classId: number, subjectIds: number[]) {
   const facultyId = (session?.user as any)?.faculty_id as number | undefined
   if (!facultyId) return { error: "Not authenticated" }
 
-  const cls = await prisma.classes.findUnique({
-    where: { id: classId, faculty_id: facultyId },
+  const cls = await prisma.classes.findFirst({
+    where: { id: classId, departments: { faculty_id: facultyId } },
   })
   if (!cls) return { error: "Class not found" }
 
   const current = await prisma.subject_class.findMany({
-    where: { class_id: classId, faculty_id: facultyId },
+    where: { class_id: classId, classes: { departments: { faculty_id: facultyId } } },
     select: { subject_id: true },
   })
   const currentIds = new Set(current.map((c) => c.subject_id))
@@ -30,7 +30,6 @@ export async function saveSubjectClass(classId: number, subjectIds: number[]) {
       await prisma.subject_class.deleteMany({
         where: {
           class_id: classId,
-          faculty_id: facultyId,
           subject_id: { in: toRemove },
         },
       })
@@ -38,7 +37,6 @@ export async function saveSubjectClass(classId: number, subjectIds: number[]) {
     if (toAdd.length) {
       await prisma.subject_class.createMany({
         data: toAdd.map((subject_id) => ({
-          faculty_id: facultyId,
           class_id: classId,
           subject_id,
         })),
