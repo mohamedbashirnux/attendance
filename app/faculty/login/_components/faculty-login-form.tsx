@@ -59,7 +59,12 @@ export function FacultyLoginForm({
                   onValueChange={(v) => setFacultyId(v ?? "")}
                 >
                   <SelectTrigger id="faculty_id" className="w-full">
-                    <SelectValue placeholder="Select faculty" />
+                    <SelectValue>
+                      {(val) => {
+                        const f = faculties.find((x) => String(x.id) === val)
+                        return f ? f.faculty_name : "Select faculty"
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {faculties.map((f) => (
