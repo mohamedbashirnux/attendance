@@ -18,7 +18,10 @@ export type AllocationRow = {
 
 export async function getAllocations(): Promise<AllocationRow[]> {
   const rows = await prisma.teacher_subject_allocation.findMany({
-    include: { teachers: true, classes: true, subjects: true },
+    include: {
+      teachers: true,
+      subject_class: { include: { classes: true, subjects: true } },
+    },
     orderBy: { id: "asc" },
   })
   return rows.map((r) => ({
@@ -26,10 +29,10 @@ export async function getAllocations(): Promise<AllocationRow[]> {
     teacher_id: r.teacher_id,
     teacher_code: r.teachers.teacher_id,
     teacher_name: r.teachers.full_name,
-    class_id: r.class_id,
-    class_name: r.classes.class_name,
-    subject_id: r.subject_id,
-    subject_name: r.subjects.subject_name,
+    class_id: r.subject_class.class_id,
+    class_name: r.subject_class.classes.class_name,
+    subject_id: r.subject_class.subject_id,
+    subject_name: r.subject_class.subjects.subject_name,
     start_time: r.start_time.toISOString(),
     end_time: r.end_time.toISOString(),
     status: r.status,
@@ -38,8 +41,11 @@ export async function getAllocations(): Promise<AllocationRow[]> {
 
 export async function getAllocationsByClass(classId: number): Promise<AllocationRow[]> {
   const rows = await prisma.teacher_subject_allocation.findMany({
-    where: { class_id: classId },
-    include: { teachers: true, classes: true, subjects: true },
+    where: { subject_class: { class_id: classId } },
+    include: {
+      teachers: true,
+      subject_class: { include: { classes: true, subjects: true } },
+    },
     orderBy: { id: "asc" },
   })
   return rows.map((r) => ({
@@ -47,10 +53,10 @@ export async function getAllocationsByClass(classId: number): Promise<Allocation
     teacher_id: r.teacher_id,
     teacher_code: r.teachers.teacher_id,
     teacher_name: r.teachers.full_name,
-    class_id: r.class_id,
-    class_name: r.classes.class_name,
-    subject_id: r.subject_id,
-    subject_name: r.subjects.subject_name,
+    class_id: r.subject_class.class_id,
+    class_name: r.subject_class.classes.class_name,
+    subject_id: r.subject_class.subject_id,
+    subject_name: r.subject_class.subjects.subject_name,
     start_time: r.start_time.toISOString(),
     end_time: r.end_time.toISOString(),
     status: r.status,
@@ -75,8 +81,11 @@ export async function getTeacherAllocationView(
   if (!cls) return { classInfo: null, allocations: [] }
 
   const rows = await prisma.teacher_subject_allocation.findMany({
-    where: { class_id: classId },
-    include: { teachers: true, classes: true, subjects: true },
+    where: { subject_class: { class_id: classId } },
+    include: {
+      teachers: true,
+      subject_class: { include: { classes: true, subjects: true } },
+    },
     orderBy: { id: "asc" },
   })
 
@@ -96,10 +105,10 @@ export async function getTeacherAllocationView(
       teacher_id: r.teacher_id,
       teacher_code: r.teachers.teacher_id,
       teacher_name: r.teachers.full_name,
-      class_id: r.class_id,
-      class_name: r.classes.class_name,
-      subject_id: r.subject_id,
-      subject_name: r.subjects.subject_name,
+      class_id: r.subject_class.class_id,
+      class_name: r.subject_class.classes.class_name,
+      subject_id: r.subject_class.subject_id,
+      subject_name: r.subject_class.subjects.subject_name,
       start_time: r.start_time.toISOString(),
       end_time: r.end_time.toISOString(),
       status: r.status,
