@@ -25,7 +25,7 @@ export async function createSubject(formData: FormData) {
 
   try {
     await prisma.subjects.create({
-      data: { faculty_id: facultyId, ...parsed.data },
+      data: { ...parsed.data },
     })
   } catch {
     return { error: "Could not create subject" }
