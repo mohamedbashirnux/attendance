@@ -59,7 +59,7 @@ export async function updateClass(id: number, formData: FormData) {
 
   try {
     await prisma.classes.update({
-      where: { id, faculty_id: facultyId },
+      where: { id },
       data: { ...parsed.data },
     })
   } catch {
