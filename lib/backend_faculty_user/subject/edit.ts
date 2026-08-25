@@ -25,7 +25,7 @@ export async function updateSubject(id: number, formData: FormData) {
 
   try {
     await prisma.subjects.update({
-      where: { id, faculty_id: facultyId },
+      where: { id },
       data: { ...parsed.data },
     })
   } catch {
