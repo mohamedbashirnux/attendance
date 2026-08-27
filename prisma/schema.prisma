@@ -20,11 +20,13 @@ model absences {
   students         students         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_1")
   classes          classes          @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_2")
   teachers         teachers         @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_3")
+  subject_class    subject_class    @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_absence_subject_class")
 
   @@unique([student_id, class_id, subject_class_id, absence_date], map: "unique_absence")
   @@index([class_id, absence_date], map: "idx_class_date")
   @@index([student_id, absence_date], map: "idx_student_date")
   @@index([teacher_id, absence_date], map: "idx_teacher_date")
+  @@index([subject_class_id], map: "idx_subject_class_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -46,25 +48,26 @@ model app_feedback {
 }
 
 model attendance_sessions {
-  id                            Int      @id @default(autoincrement())
-  teacher_subject_allocation_id Int
-  class_id                      Int
-  subject_class_id              Int
-  teacher_id                    Int
-  session_datetime              DateTime @db.DateTime(0)
-  total_students                Int      @default(0)
-  absent_students               Int      @default(0)
-  present_students              Int      @default(0)
-  attendance_percentage         Decimal? @default(0.00) @db.Decimal(5, 2)
-  notes                         String?  @db.Text
-  created_at                    DateTime @default(now()) @db.Timestamp(0)
-  updated_at                    DateTime @default(now()) @db.Timestamp(0)
-  classes                       classes  @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_1")
-  teachers                      teachers @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_2")
+  id                    Int           @id @default(autoincrement())
+  class_id              Int
+  subject_class_id      Int
+  teacher_id            Int
+  session_datetime      DateTime      @db.DateTime(0)
+  total_students        Int           @default(0)
+  absent_students       Int           @default(0)
+  present_students      Int           @default(0)
+  attendance_percentage Decimal?      @default(0.00) @db.Decimal(5, 2)
+  notes                 String?       @db.Text
+  created_at            DateTime      @default(now()) @db.Timestamp(0)
+  updated_at            DateTime      @default(now()) @db.Timestamp(0)
+  classes               classes       @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_1")
+  teachers              teachers      @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_2")
+  subject_class         subject_class @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_session_subject_class")
 
   @@index([class_id, subject_class_id, session_datetime], map: "idx_class_subject_datetime")
   @@index([session_datetime], map: "idx_session_datetime")
   @@index([teacher_id, session_datetime], map: "idx_teacher_datetime")
+  @@index([subject_class_id], map: "idx_subject_class_id")
 }
 
 model classes {
@@ -187,6 +190,8 @@ model subject_class {
   subject_id                 Int
   class_id                   Int
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  absences                   absences[]
+  attendance_sessions        attendance_sessions[]
   subjects                   subjects                     @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_2")
   classes                    classes                      @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_3")
   teacher_subject_allocation teacher_subject_allocation[]
@@ -229,7 +234,7 @@ model teacher_subject_allocation {
   timetable        timetable[]
 
   @@unique([teacher_id, subject_class_id, start_time], map: "unique_allocation")
-  @@index([subject_class_id], map: "subject_class_id")
+  @@index([subject_class_id], map: "idx_subject_class_id")
 }
 
 model teachers {
