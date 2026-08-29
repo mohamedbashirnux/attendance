@@ -8,25 +8,22 @@ datasource db {
 }
 
 model absences {
-  id               Int              @id @default(autoincrement())
-  student_id       Int
-  class_id         Int
-  subject_class_id Int
-  teacher_id       Int
-  absence_date     DateTime         @db.Date
-  excuse           absences_excuse? @default(No_Excuse)
-  created_at       DateTime         @default(now()) @db.Timestamp(0)
-  updated_at       DateTime         @default(now()) @db.Timestamp(0)
-  students         students         @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_1")
-  classes          classes          @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_2")
-  teachers         teachers         @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_3")
-  subject_class    subject_class    @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_absence_subject_class")
+  id                    Int                 @id @default(autoincrement())
+  student_id            Int
+  subject_class_id      Int
+  attendance_session_id Int
+  absence_date          DateTime            @db.Date
+  excuse                absences_excuse?    @default(No_Excuse)
+  created_at            DateTime            @default(now()) @db.Timestamp(0)
+  updated_at            DateTime            @default(now()) @db.Timestamp(0)
+  students              students            @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "absences_ibfk_1")
+  attendance_sessions   attendance_sessions @relation(fields: [attendance_session_id], references: [id], onDelete: Cascade, map: "fk_absence_session")
+  subject_class         subject_class       @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_absence_subject_class")
 
-  @@unique([student_id, class_id, subject_class_id, absence_date], map: "unique_absence")
-  @@index([class_id, absence_date], map: "idx_class_date")
+  @@unique([attendance_session_id, student_id], map: "unique_absence")
   @@index([student_id, absence_date], map: "idx_student_date")
-  @@index([teacher_id, absence_date], map: "idx_teacher_date")
   @@index([subject_class_id], map: "idx_subject_class_id")
+  @@index([attendance_session_id], map: "idx_attendance_session_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -49,7 +46,6 @@ model app_feedback {
 
 model attendance_sessions {
   id                    Int           @id @default(autoincrement())
-  class_id              Int
   subject_class_id      Int
   teacher_id            Int
   session_datetime      DateTime      @db.DateTime(0)
@@ -60,32 +56,30 @@ model attendance_sessions {
   notes                 String?       @db.Text
   created_at            DateTime      @default(now()) @db.Timestamp(0)
   updated_at            DateTime      @default(now()) @db.Timestamp(0)
-  classes               classes       @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_1")
+  absences              absences[]
   teachers              teachers      @relation(fields: [teacher_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "attendance_sessions_ibfk_2")
   subject_class         subject_class @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_session_subject_class")
 
-  @@index([class_id, subject_class_id, session_datetime], map: "idx_class_subject_datetime")
   @@index([session_datetime], map: "idx_session_datetime")
   @@index([teacher_id, session_datetime], map: "idx_teacher_datetime")
   @@index([subject_class_id], map: "idx_subject_class_id")
+  @@index([subject_class_id, session_datetime], map: "idx_subject_class_datetime")
 }
 
 model classes {
-  id                  Int                   @id @default(autoincrement())
-  department_id       Int
-  class_name          String                @db.VarChar(50)
-  study_mode          classes_study_mode
-  semester            classes_semester
-  academic_year       String                @db.VarChar(9)
-  created_at          DateTime              @default(now()) @db.Timestamp(0)
-  absences            absences[]
-  attendance_sessions attendance_sessions[]
-  departments         departments           @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "classes_ibfk_2")
-  lesson_materials    lesson_materials[]
-  notification_logs   notification_logs[]
-  students            students[]
-  subject_class       subject_class[]
-  timetable           timetable[]
+  id                Int                 @id @default(autoincrement())
+  department_id     Int
+  class_name        String              @db.VarChar(50)
+  study_mode        classes_study_mode
+  semester          classes_semester
+  academic_year     String              @db.VarChar(9)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  departments       departments         @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "classes_ibfk_2")
+  lesson_materials  lesson_materials[]
+  notification_logs notification_logs[]
+  students          students[]
+  subject_class     subject_class[]
+  timetable         timetable[]
 
   @@index([department_id], map: "department_id")
 }
@@ -246,7 +240,6 @@ model teachers {
   password                   String                       @db.VarChar(255)
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
   updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
-  absences                   absences[]
   attendance_sessions        attendance_sessions[]
   lesson_materials           lesson_materials[]
   teacher_subject_allocation teacher_subject_allocation[]
