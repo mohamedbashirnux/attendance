@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import {
-  labelFor,
-  studyModeOptions,
-  semesterOptions,
-} from "@/lib/backend_faculty_user/class/enums"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
 
 export async function OPTIONS() {
@@ -34,21 +29,23 @@ export async function GET(
 
   const { classId } = await params
   const classIdNum = Number(classId)
-  if (!classIdNum) {
+  if (!Number.isInteger(classIdNum) || classIdNum <= 0) {
     return NextResponse.json(
       { error: "Invalid class id" },
       { status: 400, headers: corsHeaders }
     )
   }
 
+  // 1. Find the teacher
   const teacher = await prisma.teachers.findUnique({
     where: { teacher_id: teacherId },
     include: {
       teacher_subject_allocation: {
-        include: { subject_class: true },
+        select: { subject_class: { select: { class_id: true } } },
       },
     },
   })
+
   if (!teacher) {
     return NextResponse.json(
       { error: "Teacher not found" },
@@ -56,6 +53,7 @@ export async function GET(
     )
   }
 
+  // 2. Check that this teacher is assigned to this class
   const isAssigned = teacher.teacher_subject_allocation.some(
     (a) => a.subject_class.class_id === classIdNum
   )
@@ -66,9 +64,13 @@ export async function GET(
     )
   }
 
+  // 3. Find the class info
   const cls = await prisma.classes.findUnique({
     where: { id: classIdNum },
-    include: { departments: { include: { faculty: true } } },
+    select: {
+      id: true,
+      class_name: true,
+    },
   })
   if (!cls) {
     return NextResponse.json(
@@ -77,38 +79,23 @@ export async function GET(
     )
   }
 
+  // 4. Fetch only the students in this class — read only, id + name
+  //    Sorted alphabetically by name so teacher/student see the same number
   const students = await prisma.students.findMany({
     where: { class_id: classIdNum },
     select: {
       student_id: true,
       full_name: true,
-      phone: true,
-      status: true,
-      created_at: true,
     },
-    orderBy: { id: "asc" },
+    orderBy: { full_name: "asc" },
   })
 
   return NextResponse.json(
     {
-      class: {
-        id: cls.id,
-        class_name: cls.class_name,
-        department_name: cls.departments.department_name,
-        faculty_name: cls.departments.faculty.faculty_name,
-        study_mode: cls.study_mode,
-        study_mode_label: labelFor(studyModeOptions, cls.study_mode),
-        semester: cls.semester,
-        semester_label: labelFor(semesterOptions, cls.semester),
-        academic_year: cls.academic_year,
-      },
-      students: students.map((s) => ({
-        student_id: s.student_id,
-        full_name: s.full_name,
-        phone: s.phone,
-        status: s.status,
-        created_at: s.created_at.toISOString(),
-      })),
+      class_id: cls.id,
+      class_name: cls.class_name,
+      count: students.length,
+      students,
     },
     { status: 200, headers: corsHeaders }
   )
