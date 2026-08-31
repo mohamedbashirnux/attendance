@@ -1,34 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
-import { z } from "zod"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
 }
 
-const bodySchema = z.object({
-  class_id: z.coerce.number().int().positive("class_id is required"),
-  subject_class_id: z.coerce.number().int().positive("subject_class_id is required"),
-  session_datetime: z
-    .string()
-    .min(1, "session_datetime is required")
-    .refine((v) => !Number.isNaN(Date.parse(v)), "session_datetime must be a valid date"),
-  absent_student_ids: z.array(z.string().min(1)).max(500),
-  excuse: z
-    .enum([
-      "No_Excuse",
-      "Family_Emergency",
-      "Medical_Appointment",
-      "Personal_Reason",
-      "Official_Duty",
-      "Other",
-    ])
-    .optional()
-    .default("No_Excuse"),
-  notes: z.string().max(1000).optional(),
-})
+type Body = {
+  subject_class_id?: number
+  class_id?: number
+  subject_id?: number
+  session_datetime?: string
+  absent_student_ids?: (number | string)[]
+  notes?: string
+}
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization")
@@ -48,27 +33,24 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: unknown
+  let body: Body
   try {
-    body = await req.json()
+    body = (await req.json()) as Body
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: "Invalid JSON body" },
       { status: 400, headers: corsHeaders }
     )
   }
 
-  const parsed = bodySchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400, headers: corsHeaders }
-    )
-  }
-
+  // 1. Find the teacher
   const teacher = await prisma.teachers.findUnique({
     where: { teacher_id: teacherId },
-    select: { id: true },
+    include: {
+      teacher_subject_allocation: {
+        select: { subject_class_id: true, status: true },
+      },
+    },
   })
   if (!teacher) {
     return NextResponse.json(
@@ -77,9 +59,53 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // 2. Resolve subject_class_id from either direct id or (class_id + subject_id)
+  let subjectClassId = Number(body.subject_class_id)
+  if (!Number.isInteger(subjectClassId) || subjectClassId <= 0) {
+    const classId = Number(body.class_id)
+    const subjectId = Number(body.subject_id)
+    if (!Number.isInteger(classId) || !Number.isInteger(subjectId)) {
+      return NextResponse.json(
+        { error: "subject_class_id is required (or class_id + subject_id)" },
+        { status: 400, headers: corsHeaders }
+      )
+    }
+    const sc = await prisma.subject_class.findFirst({
+      where: { class_id: classId, subject_id: subjectId },
+      select: { id: true },
+    })
+    if (!sc) {
+      return NextResponse.json(
+        { error: "This subject is not assigned to the selected class" },
+        { status: 400, headers: corsHeaders }
+      )
+    }
+    subjectClassId = sc.id
+  }
+
+  // 3. Verify the teacher is allocated to this subject_class AND it's approved
+  const allocation = teacher.teacher_subject_allocation.find(
+    (a) => a.subject_class_id === subjectClassId
+  )
+  if (!allocation) {
+    return NextResponse.json(
+      { error: "You are not allocated to teach this class/subject" },
+      { status: 403, headers: corsHeaders }
+    )
+  }
+  if (allocation.status !== "approved") {
+    return NextResponse.json(
+      {
+        error: `This allocation is not approved yet (current status: ${allocation.status}). You can only take attendance for approved classes.`,
+      },
+      { status: 403, headers: corsHeaders }
+    )
+  }
+
+  // 4. Get total students in this class (so we can compute present/absent counts)
   const subjectClass = await prisma.subject_class.findUnique({
-    where: { id: parsed.data.subject_class_id },
-    select: { id: true, class_id: true },
+    where: { id: subjectClassId },
+    select: { class_id: true },
   })
   if (!subjectClass) {
     return NextResponse.json(
@@ -87,116 +113,131 @@ export async function POST(req: NextRequest) {
       { status: 404, headers: corsHeaders }
     )
   }
-  if (subjectClass.class_id !== parsed.data.class_id) {
+  const totalStudents = await prisma.students.count({
+    where: { class_id: subjectClass.class_id },
+  })
+
+  // 5. Parse the absent list (deduped)
+  const absentIds = Array.isArray(body.absent_student_ids)
+    ? [
+        ...new Set(
+          body.absent_student_ids
+            .map((v) => Number(v))
+            .filter((n) => Number.isInteger(n) && n > 0)
+        ),
+      ]
+    : []
+  const absentCount = absentIds.length
+  const presentCount = totalStudents - absentCount
+
+  if (presentCount < 0) {
     return NextResponse.json(
-      { error: "subject_class_id does not belong to class_id" },
+      { error: "Absent list has more students than the class has" },
       { status: 400, headers: corsHeaders }
     )
   }
 
-  const allocation = await prisma.teacher_subject_allocation.findFirst({
-    where: {
-      teacher_id: teacher.id,
-      subject_class_id: subjectClass.id,
-    },
-    select: { status: true },
-  })
-  if (!allocation) {
-    return NextResponse.json(
-      { error: "You are not assigned to this subject class" },
-      { status: 403, headers: corsHeaders }
-    )
-  }
-  if (allocation.status !== "approved") {
-    return NextResponse.json(
-      {
-        error: `Cannot take attendance: your allocation status is "${allocation.status}". Only approved allocations can take attendance.`,
-      },
-      { status: 403, headers: corsHeaders }
-    )
-  }
-
-  const sessionDatetime = new Date(parsed.data.session_datetime)
-  const excuse = parsed.data.excuse ?? "No_Excuse"
-
-  const classStudents = await prisma.students.findMany({
-    where: { class_id: parsed.data.class_id },
-    select: { id: true, student_id: true },
-  })
-  const totalStudents = classStudents.length
-
-  const studentIdToDbId = new Map(
-    classStudents.map((s) => [s.student_id, s.id])
-  )
-  const absentDbIds: number[] = []
-  for (const sid of parsed.data.absent_student_ids) {
-    const dbId = studentIdToDbId.get(sid)
-    if (dbId === undefined) {
+  // 6. Verify each absent student actually belongs to this class
+  if (absentIds.length > 0) {
+    const valid = await prisma.students.findMany({
+      where: { id: { in: absentIds }, class_id: subjectClass.class_id },
+      select: { id: true },
+    })
+    const validIds = new Set(valid.map((s) => s.id))
+    const invalid = absentIds.filter((id) => !validIds.has(id))
+    if (invalid.length > 0) {
       return NextResponse.json(
-        { error: `Student ${sid} is not in this class` },
+        {
+          error: `These student ids are not in the class: ${invalid.join(", ")}`,
+        },
         { status: 400, headers: corsHeaders }
       )
     }
-    absentDbIds.push(dbId)
   }
 
-  const absentCount = absentDbIds.length
-  const presentCount = Math.max(0, totalStudents - absentCount)
-  const percentage =
+  // 7. Parse the session date (default to NOW)
+  let sessionDate: Date
+  if (body.session_datetime) {
+    const d = new Date(body.session_datetime)
+    if (isNaN(d.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid session_datetime" },
+        { status: 400, headers: corsHeaders }
+      )
+    }
+    sessionDate = d
+  } else {
+    sessionDate = new Date()
+  }
+
+  // 8. Create the attendance_session + absences in a transaction
+  const attendancePct =
     totalStudents > 0
       ? Math.round((presentCount / totalStudents) * 10000) / 100
       : 0
 
+  const absenceDateOnly = new Date(
+    Date.UTC(
+      sessionDate.getFullYear(),
+      sessionDate.getMonth(),
+      sessionDate.getDate()
+    )
+  )
+
   try {
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const session = await tx.attendance_sessions.create({
         data: {
-          subject_class_id: parsed.data.subject_class_id,
+          subject_class_id: subjectClassId,
           teacher_id: teacher.id,
-          session_datetime: sessionDatetime,
+          session_datetime: sessionDate,
           total_students: totalStudents,
           absent_students: absentCount,
           present_students: presentCount,
-          attendance_percentage: new Prisma.Decimal(percentage),
-          notes: parsed.data.notes ?? null,
+          attendance_percentage: attendancePct,
+          notes: body.notes ?? null,
         },
       })
 
-      if (absentDbIds.length > 0) {
+      if (absentIds.length > 0) {
         await tx.absences.createMany({
-          data: absentDbIds.map((studentDbId) => ({
+          data: absentIds.map((studentId) => ({
+            student_id: studentId,
+            subject_class_id: subjectClassId,
             attendance_session_id: session.id,
-            student_id: studentDbId,
-            subject_class_id: parsed.data.subject_class_id,
-            absence_date: sessionDatetime,
-            excuse,
+            absence_date: absenceDateOnly,
           })),
-          skipDuplicates: true,
         })
       }
 
       return session
     })
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to save attendance" },
-      { status: 500, headers: corsHeaders }
-    )
-  }
 
-  return NextResponse.json(
-    {
-      message: "Attendance saved",
-      summary: {
-        class_id: parsed.data.class_id,
-        subject_class_id: parsed.data.subject_class_id,
-        session_datetime: sessionDatetime.toISOString(),
+    return NextResponse.json(
+      {
+        success: true,
+        session_id: result.id,
+        session_datetime: result.session_datetime.toISOString(),
         total_students: totalStudents,
         present_students: presentCount,
         absent_students: absentCount,
-        attendance_percentage: percentage,
+        attendance_percentage: attendancePct,
+        absent_count_saved: absentIds.length,
       },
-    },
-    { status: 201, headers: corsHeaders }
-  )
+      { status: 201, headers: corsHeaders }
+    )
+  } catch (err: any) {
+    // Unique constraint hit means same student was already absent in this session
+    if (err?.code === "P2002") {
+      return NextResponse.json(
+        { error: "Duplicate absence entry for a student" },
+        { status: 409, headers: corsHeaders }
+      )
+    }
+    console.error("attendance create error:", err)
+    return NextResponse.json(
+      { error: "Could not save attendance" },
+      { status: 500, headers: corsHeaders }
+    )
+  }
 }
