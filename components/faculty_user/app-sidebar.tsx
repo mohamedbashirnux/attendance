@@ -12,6 +12,7 @@ import {
   UserPlus,
   BookUser,
   CalendarOff,
+  Users,
 } from "lucide-react"
 import {
   Collapsible,
@@ -40,6 +41,7 @@ const navMain = [
       { title: "Class", url: "/faculty_user/class", icon: School },
       { title: "Subject", url: "/faculty_user/subject", icon: BookOpen },
       { title: "Subject Class", url: "/faculty_user/subject-class/selection", icon: Layers },
+      { title: "Students", url: "/faculty_user/student/selection", icon: Users },
     ],
   },
   {

@@ -34,7 +34,7 @@ export function FacultyLoginForm({
   className,
   ...props
 }: React.ComponentProps<"div"> & { faculties: FacultyRow[] }) {
-  const [facultyId, setFacultyId] = React.useState("")
+  const [facultyId, setFacultyId] = React.useState<string | null>(null)
   const [state, formAction, pending] = useActionState<State | undefined, FormData>(
     facultyLoginAction,
     undefined
@@ -55,8 +55,8 @@ export function FacultyLoginForm({
               <Field>
                 <FieldLabel htmlFor="faculty_id">Faculty</FieldLabel>
                 <Select
-                  value={facultyId || undefined}
-                  onValueChange={(v) => setFacultyId(v ?? "")}
+                  value={facultyId}
+                  onValueChange={(v) => setFacultyId(v ?? null)}
                 >
                   <SelectTrigger id="faculty_id" className="w-full">
                     <SelectValue>
@@ -74,7 +74,7 @@ export function FacultyLoginForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <input type="hidden" name="faculty_id" value={facultyId} />
+                <input type="hidden" name="faculty_id" value={facultyId ?? ""} />
                 {state?.errors?.faculty_id?.[0] && (
                   <p className="text-sm text-destructive">
                     {state.errors.faculty_id[0]}

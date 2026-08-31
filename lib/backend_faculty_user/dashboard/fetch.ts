@@ -32,7 +32,11 @@ export async function getFacultyDashboardClasses(departmentId?: number): Promise
     classes.map(async (c) => {
       const [total, absentGroups] = await Promise.all([
         prisma.students.count({ where: { class_id: c.id } }),
-        prisma.absences.groupBy({ by: ["student_id"], where: { class_id: c.id } }),
+        prisma.absences.findMany({
+          where: { students: { class_id: c.id } },
+          select: { student_id: true },
+          distinct: ["student_id"],
+        }),
       ])
       const absent = absentGroups.length
       const rate = total ? Math.round((absent / total) * 100) : 0

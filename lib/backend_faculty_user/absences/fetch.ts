@@ -37,11 +37,11 @@ export async function getAbsenceClassView(
       include: { subjects: true },
     }),
     prisma.attendance_sessions.findMany({
-      where: { class_id: classId },
+      where: { subject_class: { class_id: classId } },
       select: { subject_class_id: true },
     }),
     prisma.absences.findMany({
-      where: { class_id: classId },
+      where: { students: { class_id: classId } },
       select: { student_id: true, subject_class_id: true },
     }),
   ])
