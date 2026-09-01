@@ -81,7 +81,7 @@ export function TeacherAllocationView({ allocations, classInfo, classId }: Props
       <TeacherAllocationTable
         data={allocations}
         onDelete={(r) => setDeleting(r)}
-        onAllowed={() => router.refresh()}
+        onChanged={() => router.refresh()}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null) }}>

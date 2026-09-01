@@ -13,11 +13,16 @@ import {
 import type { AllocationRow } from "@/lib/backend_faculty_user/teacher_subject_allocation/fetch"
 import { Button } from "@/components/ui/button"
 import {
-  computeLiveStatus,
-  statusColors,
-  type LiveStatus,
-} from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
-import { setWaiting } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { statusColors, type AllocationStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
+import { setStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
@@ -26,12 +31,10 @@ function fmtTime(v: string): string {
   return t.slice(0, 5)
 }
 
-function liveOf(row: AllocationRow, now: Date): LiveStatus {
-  return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
-}
+const ALL_STATUSES: AllocationStatus[] = ["pending", "waiting", "approved"]
 
-function StatusBadge({ live }: { live: LiveStatus }) {
-  const c = statusColors[live]
+function StatusBadge({ status }: { status: AllocationStatus }) {
+  const c = statusColors[status]
   return (
     <span
       className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text} ${c.border}`}
@@ -41,42 +44,39 @@ function StatusBadge({ live }: { live: LiveStatus }) {
   )
 }
 
-// Explicit hover-bg map because Tailwind needs full class names at build time.
-const hoverBgMap: Record<LiveStatus, string> = {
-  pending: "hover:bg-yellow-100",
-  waiting: "hover:bg-red-100",
-  approved: "hover:bg-green-100",
-}
-
 export function TeacherAllocationTable({
   data,
   onDelete,
-  onAllowed,
+  onChanged,
 }: {
   data: AllocationRow[]
   onDelete: (r: AllocationRow) => void
-  onAllowed: () => void
+  onChanged: () => void
 }) {
-  const [busyId, setBusyId] = React.useState<number | null>(null)
+  const [selected, setSelected] = React.useState<AllocationRow | null>(null)
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  // Re-evaluate "now" every 30s so the badge/button update as time passes
-  // without the user needing to manually refresh the page.
-  const [now, setNow] = React.useState<Date>(() => new Date())
-  React.useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000)
-    return () => clearInterval(t)
-  }, [])
 
-  async function handleAllow(id: number) {
+  function openChangeDialog(row: AllocationRow) {
+    setSelected(row)
     setError(null)
-    setBusyId(id)
-    const res = await setWaiting(id)
-    setBusyId(null)
+    setDialogOpen(true)
+  }
+
+  async function pickStatus(next: AllocationStatus) {
+    if (!selected) return
+    setBusy(true)
+    setError(null)
+    const res = await setStatus(selected.id, next)
+    setBusy(false)
     if (res && "error" in res) {
-      setError(res.error ?? "Could not allow")
+      setError(res.error ?? "Could not change status")
       return
     }
-    onAllowed()
+    setDialogOpen(false)
+    setSelected(null)
+    onChanged()
   }
 
   const columns = React.useMemo(
@@ -96,38 +96,30 @@ export function TeacherAllocationTable({
       helper.display({
         id: "status",
         header: "Status",
-        cell: (info) => <StatusBadge live={liveOf(info.row.original, now)} />,
+        cell: (info) => {
+          const status = (info.row.original.status ?? "pending") as AllocationStatus
+          return <StatusBadge status={status} />
+        },
       }),
       helper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => {
-          const row = info.row.original
-          const live = liveOf(row, now)
-          // Allow is only meaningful when the row is still in the DB "pending" state.
-          // Once it's waiting/approved, the live status updates automatically with time.
-          const canAllow = row.status === "pending"
-          const c = statusColors[live]
-          return (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className={`rounded-md border ${c.border} ${c.text} ${hoverBgMap[live]} disabled:opacity-50`}
-                disabled={!canAllow || busyId === row.id}
-                onClick={() => handleAllow(row.id)}
-              >
-                {busyId === row.id ? "Allowing…" : "Allow"}
-              </Button>
-              <Button size="sm" variant="destructive" className="rounded-md" onClick={() => onDelete(row)}>
-                Delete
-              </Button>
-            </div>
-          )
-        },
+        cell: (info) => (
+          <Button
+            size="sm"
+            variant="destructive"
+            className="rounded-md"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(info.row.original)
+            }}
+          >
+            Delete
+          </Button>
+        ),
       }),
     ],
-    [busyId, now],
+    [],
   )
 
   const table = useTable({
@@ -135,6 +127,9 @@ export function TeacherAllocationTable({
     columns,
     data,
   })
+
+  const currentStatus: AllocationStatus =
+    (selected?.status ?? "pending") as AllocationStatus
 
   return (
     <div className="space-y-2">
@@ -163,7 +158,11 @@ export function TeacherAllocationTable({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b last:border-0">
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-b last:border-0 hover:bg-muted/40"
+                  onClick={() => openChangeDialog(row.original)}
+                >
                   {row.getAllCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-2">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -175,6 +174,51 @@ export function TeacherAllocationTable({
           </tbody>
         </table>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Status</DialogTitle>
+            <DialogDescription>
+              {selected
+                ? `Set the status for ${selected.teacher_name} — ${selected.subject_name} (${fmtTime(selected.start_time)}–${fmtTime(selected.end_time)}).`
+                : "Select a status for this allocation."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selected ? (
+            <div className="space-y-3">
+              <div className="text-sm">
+                Current status: <StatusBadge status={currentStatus} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ALL_STATUSES.map((s) => {
+                  const c = statusColors[s]
+                  const isCurrent = s === currentStatus
+                  return (
+                    <Button
+                      key={s}
+                      variant="outline"
+                      className={`rounded-md border ${c.border} ${c.text} ${c.bg} hover:opacity-80`}
+                      disabled={busy || isCurrent}
+                      onClick={() => pickStatus(s)}
+                    >
+                      {isCurrent ? `${c.label} (current)` : `Set ${c.label}`}
+                    </Button>
+                  )
+                })}
+              </div>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" className="rounded-md" />}>
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
