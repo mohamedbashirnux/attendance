@@ -12,6 +12,11 @@ import {
 } from "@tanstack/table-core"
 import type { AllocationRow } from "@/lib/backend_faculty_user/teacher_subject_allocation/fetch"
 import { Button } from "@/components/ui/button"
+import {
+  computeLiveStatus,
+  statusColors,
+} from "@/lib/backend_faculty_user/teacher_subject_allocation/status"
+import { setWaiting } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
@@ -20,15 +25,48 @@ function fmtTime(v: string): string {
   return t.slice(0, 5)
 }
 
+function StatusBadge({ live }: { live: ReturnType<typeof computeLiveStatus> }) {
+  const c = statusColors[live]
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text}`}
+    >
+      {c.label}
+    </span>
+  )
+}
+
 export function TeacherAllocationTable({
   data,
   onDelete,
+  onAllowed,
 }: {
   data: AllocationRow[]
   onDelete: (r: AllocationRow) => void
+  onAllowed: () => void
 }) {
+  const [busyId, setBusyId] = React.useState<number | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function handleAllow(id: number) {
+    setError(null)
+    setBusyId(id)
+    const res = await setWaiting(id)
+    setBusyId(null)
+    if (res && "error" in res) {
+      setError(res.error ?? "Could not allow")
+      return
+    }
+    onAllowed()
+  }
+
   const columns = React.useMemo(
     (): ColumnDef<TableFeatures, AllocationRow, any>[] => [
+      helper.display({
+        id: "no",
+        header: "No.",
+        cell: (info) => info.row.index + 1,
+      }),
       helper.accessor("teacher_code", {
         header: "Teacher",
         cell: (info) => `${info.getValue()} — ${info.row.original.teacher_name}`,
@@ -36,18 +74,41 @@ export function TeacherAllocationTable({
       helper.accessor("subject_name", { header: "Subject" }),
       helper.accessor("start_time", { header: "Start", cell: (info) => fmtTime(info.getValue()) }),
       helper.accessor("end_time", { header: "End", cell: (info) => fmtTime(info.getValue()) }),
-      helper.accessor("status", { header: "Status" }),
+      helper.display({
+        id: "status",
+        header: "Status",
+        cell: (info) => {
+          const row = info.row.original
+          const live = computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time))
+          return <StatusBadge live={live} />
+        },
+      }),
       helper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => (
-          <Button size="sm" variant="destructive" onClick={() => onDelete(info.row.original)}>
-            Delete
-          </Button>
-        ),
+        cell: (info) => {
+          const row = info.row.original
+          const live = computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time))
+          const canAllow = row.status === "pending"
+          return (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="default"
+                disabled={!canAllow || busyId === row.id}
+                onClick={() => handleAllow(row.id)}
+              >
+                {busyId === row.id ? "Allowing…" : "Allow"}
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => onDelete(row)}>
+                Delete
+              </Button>
+            </div>
+          )
+        },
       }),
     ],
-    [onDelete],
+    [busyId],
   )
 
   const table = useTable({
@@ -57,41 +118,44 @@ export function TeacherAllocationTable({
   })
 
   return (
-    <div className="overflow-hidden rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="border-b">
-              {headerGroup.headers.map((header) => (
-                <th key={header.id} className="px-4 py-2 text-left font-medium">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                No allocations yet.
-              </td>
-            </tr>
-          ) : (
-            table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b last:border-0">
-                {row.getAllCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-2">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+    <div className="space-y-2">
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <div className="overflow-hidden rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="border-b">
+                {headerGroup.headers.map((header) => (
+                  <th key={header.id} className="px-4 py-2 text-left font-medium">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
                 ))}
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
+                  No allocations yet.
+                </td>
+              </tr>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="border-b last:border-0">
+                  {row.getAllCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-2">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

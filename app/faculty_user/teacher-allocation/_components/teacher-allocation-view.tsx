@@ -78,7 +78,11 @@ export function TeacherAllocationView({ allocations, classInfo, classId }: Props
       </div>
 
       <h2 className="font-medium">Allocations</h2>
-      <TeacherAllocationTable data={allocations} onDelete={(r) => setDeleting(r)} />
+      <TeacherAllocationTable
+        data={allocations}
+        onDelete={(r) => setDeleting(r)}
+        onAllowed={() => router.refresh()}
+      />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null) }}>
         <AlertDialogContent>
