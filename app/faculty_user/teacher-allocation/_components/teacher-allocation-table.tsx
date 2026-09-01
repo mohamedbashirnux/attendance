@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button"
 import {
   computeLiveStatus,
   statusColors,
-} from "@/lib/backend_faculty_user/teacher_subject_allocation/status"
-import { setWaiting } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
+  setWaiting,
+  type LiveStatus,
+} from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
@@ -25,15 +26,26 @@ function fmtTime(v: string): string {
   return t.slice(0, 5)
 }
 
-function StatusBadge({ live }: { live: ReturnType<typeof computeLiveStatus> }) {
+function liveOf(row: AllocationRow, now: Date): LiveStatus {
+  return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
+}
+
+function StatusBadge({ live }: { live: LiveStatus }) {
   const c = statusColors[live]
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text}`}
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text} ${c.border}`}
     >
       {c.label}
     </span>
   )
+}
+
+// Explicit hover-bg map because Tailwind needs full class names at build time.
+const hoverBgMap: Record<LiveStatus, string> = {
+  pending: "hover:bg-yellow-100",
+  waiting: "hover:bg-red-100",
+  approved: "hover:bg-green-100",
 }
 
 export function TeacherAllocationTable({
@@ -47,6 +59,13 @@ export function TeacherAllocationTable({
 }) {
   const [busyId, setBusyId] = React.useState<number | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  // Re-evaluate "now" every 30s so the badge/button update as time passes
+  // without the user needing to manually refresh the page.
+  const [now, setNow] = React.useState<Date>(() => new Date())
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   async function handleAllow(id: number) {
     setError(null)
@@ -77,30 +96,30 @@ export function TeacherAllocationTable({
       helper.display({
         id: "status",
         header: "Status",
-        cell: (info) => {
-          const row = info.row.original
-          const live = computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time))
-          return <StatusBadge live={live} />
-        },
+        cell: (info) => <StatusBadge live={liveOf(info.row.original, now)} />,
       }),
       helper.display({
         id: "actions",
         header: "Actions",
         cell: (info) => {
           const row = info.row.original
-          const live = computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time))
+          const live = liveOf(row, now)
+          // Allow is only meaningful when the row is still in the DB "pending" state.
+          // Once it's waiting/approved, the live status updates automatically with time.
           const canAllow = row.status === "pending"
+          const c = statusColors[live]
           return (
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant="default"
+                variant="outline"
+                className={`rounded-md border ${c.border} ${c.text} ${hoverBgMap[live]} disabled:opacity-50`}
                 disabled={!canAllow || busyId === row.id}
                 onClick={() => handleAllow(row.id)}
               >
                 {busyId === row.id ? "Allowing…" : "Allow"}
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => onDelete(row)}>
+              <Button size="sm" variant="destructive" className="rounded-md" onClick={() => onDelete(row)}>
                 Delete
               </Button>
             </div>
@@ -108,7 +127,7 @@ export function TeacherAllocationTable({
         },
       }),
     ],
-    [busyId],
+    [busyId, now],
   )
 
   const table = useTable({
