@@ -15,9 +15,9 @@ import { Button } from "@/components/ui/button"
 import {
   computeLiveStatus,
   statusColors,
-  setWaiting,
   type LiveStatus,
 } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
+import { setWaiting } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 

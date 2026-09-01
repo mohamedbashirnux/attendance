@@ -1,6 +1,5 @@
-// Combined: pure helpers + server action for teacher allocation status.
-// Uses inline 'use server' on the action only, so the file can also export
-// pure (non-async) helpers and constants that the client can import.
+// Pure helpers for teacher allocation status (no "use server" directive so this
+// file can be safely imported by Client Components).
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
@@ -56,42 +55,4 @@ export const statusColors: Record<LiveStatus, { bg: string; text: string; border
   pending:  { bg: "bg-yellow-50",  text: "text-yellow-800",  border: "border-yellow-300", label: "pending" },
   waiting:  { bg: "bg-red-50",     text: "text-red-800",     border: "border-red-300",    label: "waiting" },
   approved: { bg: "bg-green-50",   text: "text-green-800",   border: "border-green-300",  label: "approved" },
-}
-
-/**
- * Server action: move a teacher allocation from "pending" to "waiting".
- *
- * - Requires a signed-in faculty user.
- * - The allocation's class must belong to the signed-in user's faculty.
- * - Refuses if the current stored status is anything other than "pending".
- */
-export async function setWaiting(id: number) {
-  "use server"
-  const session = await auth()
-  const facultyId = (session?.user as any)?.faculty_id as number | undefined
-  if (!facultyId) return { error: "Not authenticated" }
-
-  const row = await prisma.teacher_subject_allocation.findUnique({
-    where: { id },
-    include: { subject_class: { include: { classes: { include: { departments: true } } } } },
-  })
-  if (!row) return { error: "Allocation not found" }
-  if (row.subject_class.classes.departments.faculty_id !== facultyId) {
-    return { error: "This allocation does not belong to your faculty" }
-  }
-  if (row.status !== "pending") {
-    return { error: `Cannot allow: current status is "${row.status}". Only pending allocations can be allowed.` }
-  }
-
-  try {
-    await prisma.teacher_subject_allocation.update({
-      where: { id },
-      data: { status: "waiting" },
-    })
-  } catch {
-    return { error: "Could not update status" }
-  }
-
-  revalidatePath("/faculty_user/teacher-allocation")
-  return { ok: true as const }
 }
