@@ -34,15 +34,15 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
   const router = useRouter()
   const [teacherCode, setTeacherCode] = React.useState("")
   const [teacherLookup, setTeacherLookup] = React.useState<Lookup>(undefined)
-  const [departmentId, setDepartmentId] = React.useState("")
-  const [classId, setClassId] = React.useState("")
-  const [subjectId, setSubjectId] = React.useState("")
+  const [departmentId, setDepartmentId] = React.useState<string | null>(null)
+  const [classId, setClassId] = React.useState<string | null>(null)
+  const [subjectId, setSubjectId] = React.useState<string | null>(null)
   const [startTime, setStartTime] = React.useState("")
   const [endTime, setEndTime] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [viewOpen, setViewOpen] = React.useState(false)
-  const [viewDept, setViewDept] = React.useState("")
-  const [viewClass, setViewClass] = React.useState("")
+  const [viewDept, setViewDept] = React.useState<string | null>(null)
+  const [viewClass, setViewClass] = React.useState<string | null>(null)
 
   const classOptions = React.useMemo(
     () => (departmentId ? classes.filter((c) => c.department_id === Number(departmentId)) : classes),
@@ -62,13 +62,13 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
     : classes
 
   function onDeptChange(v: string | null) {
-    setDepartmentId(v ?? "")
-    setClassId("")
-    setSubjectId("")
+    setDepartmentId(v)
+    setClassId(null)
+    setSubjectId(null)
   }
   function onClassChange(v: string | null) {
-    setClassId(v ?? "")
-    setSubjectId("")
+    setClassId(v)
+    setSubjectId(null)
   }
 
   async function lookupTeacher() {
@@ -111,9 +111,9 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
     }
     setTeacherCode("")
     setTeacherLookup(undefined)
-    setDepartmentId("")
-    setClassId("")
-    setSubjectId("")
+    setDepartmentId(null)
+    setClassId(null)
+    setSubjectId(null)
     setStartTime("")
     setEndTime("")
     router.refresh()
@@ -154,7 +154,7 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
           </div>
           <div className="space-y-1.5">
             <Label>Department</Label>
-            <Select value={departmentId || undefined} onValueChange={onDeptChange}>
+            <Select value={departmentId} onValueChange={onDeptChange}>
               <SelectTrigger className="w-full">
                 <SelectValue>
                   {(val) => {
@@ -174,7 +174,7 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
           </div>
           <div className="space-y-1.5">
             <Label>Class</Label>
-            <Select value={classId || undefined} onValueChange={onClassChange} disabled={!departmentId}>
+            <Select value={classId} onValueChange={onClassChange} disabled={!departmentId}>
               <SelectTrigger className="w-full">
                 <SelectValue>
                   {(val) => {
@@ -195,8 +195,8 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
           <div className="space-y-1.5">
             <Label>Subject</Label>
             <Select
-              value={subjectId || undefined}
-              onValueChange={(v) => setSubjectId(v ?? "")}
+              value={subjectId}
+              onValueChange={(v) => setSubjectId(v)}
               disabled={!classId}
             >
               <SelectTrigger className="w-full">
@@ -258,10 +258,10 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
             <div className="space-y-1.5">
               <Label>Department</Label>
               <Select
-                value={viewDept || undefined}
+                value={viewDept}
                 onValueChange={(v) => {
-                  setViewDept(v ?? "")
-                  setViewClass("")
+                  setViewDept(v)
+                  setViewClass(null)
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -284,8 +284,8 @@ export function TeacherAllocationSelection({ departments, classes, subjects, ass
             <div className="space-y-1.5">
               <Label>Class</Label>
               <Select
-                value={viewClass || undefined}
-                onValueChange={(v) => setViewClass(v ?? "")}
+                value={viewClass}
+                onValueChange={(v) => setViewClass(v)}
                 disabled={!viewDept}
               >
                 <SelectTrigger className="w-full">

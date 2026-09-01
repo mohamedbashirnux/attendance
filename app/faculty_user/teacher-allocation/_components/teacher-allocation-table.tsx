@@ -26,7 +26,8 @@ function fmtTime(v: string): string {
   return t.slice(0, 5)
 }
 
-function liveOf(row: AllocationRow, now: Date): AllocationStatus {
+function liveOf(row: AllocationRow, now: Date | null): AllocationStatus {
+  if (!now) return (row.status ?? "pending") as AllocationStatus
   return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
 }
 
@@ -48,11 +49,41 @@ function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onCl
   )
 }
 
-// Cycle: pending -> waiting -> approved -> pending
-function nextOf(s: AllocationStatus): AllocationStatus {
-  if (s === "pending") return "waiting"
-  if (s === "waiting") return "approved"
-  return "pending"
+// Click logic: time-aware. The dean's click combined with the current time
+// determines the next stored status.
+//
+// - click on 'pending':
+//     * inside [start, end]  -> 'approved'  (dean + time both ok)
+//     * before start         -> 'waiting'   (dean approved, waiting for time)
+//     * after end            -> 'waiting'   (re-arm for next session)
+// - click on 'waiting'  -> 'approved' (force approval)
+// - click on 'approved' -> 'pending'  (reset)
+function nextOnClick(
+  current: AllocationStatus,
+  startTime: Date,
+  endTime: Date,
+  now: Date | null
+): AllocationStatus {
+  if (current === "waiting") return "approved"
+  if (current === "approved") return "pending"
+
+  // current === "pending"
+  if (!now) return "waiting"
+  const nowMs =
+    now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+  const startMs =
+    startTime.getHours() * 3600_000 +
+    startTime.getMinutes() * 60_000 +
+    startTime.getSeconds() * 1000
+  const endMs =
+    endTime.getHours() * 3600_000 +
+    endTime.getMinutes() * 60_000 +
+    endTime.getSeconds() * 1000
+
+  // Inside the window -> dean + time both ok -> go straight to approved
+  if (nowMs >= startMs && nowMs <= endMs) return "approved"
+  // Otherwise just stage the dean's approval -> waiting
+  return "waiting"
 }
 
 export function TeacherAllocationTable({
@@ -66,10 +97,15 @@ export function TeacherAllocationTable({
 }) {
   const [busyId, setBusyId] = React.useState<number | null>(null)
   const [error, setError] = React.useState<string | null>(null)
-  // Re-evaluate "now" every 30s so the live status updates as time passes
-  // without the user refreshing the page.
-  const [now, setNow] = React.useState<Date>(() => new Date())
+  // Track the current "now" on the client only. Start with null so SSR and
+  // the first client render agree (avoids a hydration mismatch), then set
+  // it in an effect and refresh every 30s.
+  const [now, setNow] = React.useState<Date | null>(null)
+  // Mounted flag so the badge is non-interactive during SSR / first paint.
+  const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => {
+    setMounted(true)
+    setNow(new Date())
     const t = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(t)
   }, [])
@@ -77,7 +113,12 @@ export function TeacherAllocationTable({
   async function handleBadgeClick(row: AllocationRow) {
     setError(null)
     const current = (row.status ?? "pending") as AllocationStatus
-    const next = nextOf(current)
+    const next = nextOnClick(
+      current,
+      new Date(row.start_time),
+      new Date(row.end_time),
+      now
+    )
     setBusyId(row.id)
     const res = await changeStatus(row.id, next)
     setBusyId(null)
@@ -111,7 +152,7 @@ export function TeacherAllocationTable({
           return (
             <StatusBadge
               status={live}
-              onClick={() => handleBadgeClick(row)}
+              onClick={mounted ? () => handleBadgeClick(row) : undefined}
               busy={busyId === row.id}
             />
           )
