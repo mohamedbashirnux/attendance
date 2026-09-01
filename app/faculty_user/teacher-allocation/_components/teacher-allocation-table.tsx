@@ -13,15 +13,6 @@ import {
 import type { AllocationRow } from "@/lib/backend_faculty_user/teacher_subject_allocation/fetch"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   computeLiveStatus,
   statusColors,
   type AllocationStatus,
@@ -50,7 +41,12 @@ function StatusBadge({ status }: { status: AllocationStatus }) {
   )
 }
 
-const ALL_STATUSES: AllocationStatus[] = ["pending", "waiting", "approved"]
+// Cycle: pending -> waiting -> approved -> pending
+function nextOf(s: AllocationStatus): AllocationStatus {
+  if (s === "pending") return "waiting"
+  if (s === "waiting") return "approved"
+  return "pending"
+}
 
 export function TeacherAllocationTable({
   data,
@@ -61,9 +57,7 @@ export function TeacherAllocationTable({
   onDelete: (r: AllocationRow) => void
   onChanged: () => void
 }) {
-  const [selected, setSelected] = React.useState<AllocationRow | null>(null)
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [busy, setBusy] = React.useState(false)
+  const [busyId, setBusyId] = React.useState<number | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   // Re-evaluate "now" every 30s so the live status updates as time passes
   // without the user refreshing the page.
@@ -73,24 +67,17 @@ export function TeacherAllocationTable({
     return () => clearInterval(t)
   }, [])
 
-  function openDialog(row: AllocationRow) {
-    setSelected(row)
+  async function handleCycle(row: AllocationRow) {
     setError(null)
-    setDialogOpen(true)
-  }
-
-  async function pickStatus(next: AllocationStatus) {
-    if (!selected) return
-    setBusy(true)
-    setError(null)
-    const res = await changeStatus(selected.id, next)
-    setBusy(false)
+    const current = (row.status ?? "pending") as AllocationStatus
+    const next = nextOf(current)
+    setBusyId(row.id)
+    const res = await changeStatus(row.id, next)
+    setBusyId(null)
     if (res && "error" in res) {
       setError(res.error ?? "Could not change status")
       return
     }
-    setDialogOpen(false)
-    setSelected(null)
     onChanged()
   }
 
@@ -112,44 +99,44 @@ export function TeacherAllocationTable({
         id: "status",
         header: "Status",
         cell: (info) => {
-          // Show the LIVE status (DB value + time-based promotion/revert).
           const live = liveOf(info.row.original, now)
-          return (
-            <div className="flex flex-col items-start gap-0.5">
-              <StatusBadge status={live} />
-              <span className="text-[10px] text-muted-foreground">
-                stored: {info.row.original.status ?? "pending"}
-              </span>
-            </div>
-          )
+          return <StatusBadge status={live} />
         },
       }),
       helper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-md"
-              onClick={() => openDialog(info.row.original)}
-            >
-              Change
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              className="rounded-md"
-              onClick={() => onDelete(info.row.original)}
-            >
-              Delete
-            </Button>
-          </div>
-        ),
+        cell: (info) => {
+          const row = info.row.original
+          const current = (row.status ?? "pending") as AllocationStatus
+          const next = nextOf(current)
+          const nextColors = statusColors[next]
+          const busy = busyId === row.id
+          return (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className={`rounded-md border ${nextColors.border} ${nextColors.text} ${nextColors.bg} hover:opacity-80`}
+                disabled={busy}
+                onClick={() => handleCycle(row)}
+              >
+                {busy ? "Saving…" : `Set ${next}`}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="rounded-md"
+                onClick={() => onDelete(row)}
+              >
+                Delete
+              </Button>
+            </div>
+          )
+        },
       }),
     ],
-    [now],
+    [busyId, now],
   )
 
   const table = useTable({
@@ -157,9 +144,6 @@ export function TeacherAllocationTable({
     columns,
     data,
   })
-
-  const currentStatus: AllocationStatus =
-    (selected?.status ?? "pending") as AllocationStatus
 
   return (
     <div className="space-y-2">
@@ -200,51 +184,6 @@ export function TeacherAllocationTable({
           </tbody>
         </table>
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Status</DialogTitle>
-            <DialogDescription>
-              {selected
-                ? `Set the status for ${selected.teacher_name} — ${selected.subject_name} (${fmtTime(selected.start_time)}–${fmtTime(selected.end_time)}).`
-                : "Select a status for this allocation."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selected ? (
-            <div className="space-y-3">
-              <div className="text-sm">
-                Current stored status: <StatusBadge status={currentStatus} />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {ALL_STATUSES.map((s) => {
-                  const c = statusColors[s]
-                  const isCurrent = s === currentStatus
-                  return (
-                    <Button
-                      key={s}
-                      variant="outline"
-                      className={`rounded-md border ${c.border} ${c.text} ${c.bg} hover:opacity-80`}
-                      disabled={busy || isCurrent}
-                      onClick={() => pickStatus(s)}
-                    >
-                      {isCurrent ? `${c.label} (current)` : `Set ${c.label}`}
-                    </Button>
-                  )
-                })}
-              </div>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            </div>
-          ) : null}
-
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" className="rounded-md" />}>
-              Close
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

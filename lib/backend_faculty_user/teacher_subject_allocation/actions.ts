@@ -8,17 +8,14 @@ const VALID_STATUSES = ["pending", "waiting", "approved"] as const
 type AllocationStatus = (typeof VALID_STATUSES)[number]
 
 /**
- * Server action: set the status of a teacher allocation to any of
- * "pending" | "waiting" | "approved". The faculty user can change the
- * stored status at any time, regardless of the current time window.
+ * Server action: set the status of a teacher allocation.
+ * Used by the cycle button on each row:
+ *   pending  -> waiting
+ *   waiting  -> approved
+ *   approved -> pending
  *
  * - Requires a signed-in faculty user.
  * - The allocation's class must belong to the signed-in user's faculty.
- *
- * Note: the *visual* status badge still uses computeLiveStatus (live) so
- * even if the stored status is "waiting" or "approved", outside the time
- * window it will display as "pending". This action changes the *stored*
- * status only.
  */
 export async function changeStatus(id: number, newStatus: string) {
   const session = await auth()
