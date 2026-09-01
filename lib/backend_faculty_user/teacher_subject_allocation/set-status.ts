@@ -10,10 +10,14 @@ export type AllocationStatus = "pending" | "waiting" | "approved"
  *  - If the stored status is "pending", live status is always "pending".
  *  - If the stored status is "waiting":
  *      - inside the time window  -> live status becomes "approved"
- *      - outside the time window -> live status is "pending" (time hasn't started or has ended)
+ *      - outside the time window -> live status stays "waiting" (the dean
+ *        pre-approved, but the time hasn't started yet OR already passed for
+ *        the current day; either way, the next time the window opens the
+ *        live status will auto-promote to approved).
  *  - If the stored status is "approved":
  *      - inside the time window  -> live status is "approved"
- *      - outside the time window -> live status reverts to "pending" (time ended)
+ *      - outside the time window -> live status reverts to "pending" (the
+ *        class session is over; dean must re-allow for the next session).
  *
  * Day of week and timetable are NOT considered.
  */
@@ -25,15 +29,26 @@ export function computeLiveStatus(
 ): AllocationStatus {
   const stored = (storedStatus ?? "pending") as AllocationStatus
   if (stored === "pending") return "pending"
+  if (stored === "waiting") {
+    // 'waiting' is "dean pre-approved" — it should stay 'waiting' until the
+    // time window opens, at which point it auto-promotes to 'approved'.
+    const nowMs =
+      now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+    const startMs = timeToMs(startTime)
+    const endMs = timeToMs(endTime)
+    const inside = nowMs >= startMs && nowMs <= endMs
+    if (inside) return "approved"
+    return "waiting"
+  }
 
+  // stored === "approved"
+  // If the time window is open, keep showing 'approved'.
+  // If the time window has CLOSED (now > end), revert to 'pending' so the
+  // dean knows the class session is over.
   const nowMs =
     now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
-  const startMs = timeToMs(startTime)
   const endMs = timeToMs(endTime)
-
-  const inside = nowMs >= startMs && nowMs <= endMs
-
-  if (inside) return "approved"
+  if (nowMs <= endMs) return "approved"
   return "pending"
 }
 
