@@ -13,11 +13,20 @@ import {
 import type { AllocationRow } from "@/lib/backend_faculty_user/teacher_subject_allocation/fetch"
 import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   computeLiveStatus,
   statusColors,
   type AllocationStatus,
 } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
-import { setWaiting } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
+import { changeStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
@@ -41,6 +50,8 @@ function StatusBadge({ status }: { status: AllocationStatus }) {
   )
 }
 
+const ALL_STATUSES: AllocationStatus[] = ["pending", "waiting", "approved"]
+
 export function TeacherAllocationTable({
   data,
   onDelete,
@@ -50,31 +61,36 @@ export function TeacherAllocationTable({
   onDelete: (r: AllocationRow) => void
   onChanged: () => void
 }) {
-  const [busyId, setBusyId] = React.useState<number | null>(null)
+  const [selected, setSelected] = React.useState<AllocationRow | null>(null)
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  // Re-evaluate "now" every 30s so the live status (waiting/approved) updates
-  // as time passes, without a manual page refresh.
+  // Re-evaluate "now" every 30s so the live status updates as time passes
+  // without the user refreshing the page.
   const [now, setNow] = React.useState<Date>(() => new Date())
   React.useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(t)
   }, [])
 
-  async function handleRowClick(row: AllocationRow) {
+  function openDialog(row: AllocationRow) {
+    setSelected(row)
     setError(null)
-    // Only allow clicking when the stored status is "pending" (waiting/approved
-    // are managed by time, not by clicks).
-    if (row.status !== "pending") {
-      setError(`This allocation is already "${row.status}". Wait for the time window or for the session to end.`)
-      return
-    }
-    setBusyId(row.id)
-    const res = await setWaiting(row.id)
-    setBusyId(null)
+    setDialogOpen(true)
+  }
+
+  async function pickStatus(next: AllocationStatus) {
+    if (!selected) return
+    setBusy(true)
+    setError(null)
+    const res = await changeStatus(selected.id, next)
+    setBusy(false)
     if (res && "error" in res) {
-      setError(res.error ?? "Could not allow allocation")
+      setError(res.error ?? "Could not change status")
       return
     }
+    setDialogOpen(false)
+    setSelected(null)
     onChanged()
   }
 
@@ -96,25 +112,40 @@ export function TeacherAllocationTable({
         id: "status",
         header: "Status",
         cell: (info) => {
+          // Show the LIVE status (DB value + time-based promotion/revert).
           const live = liveOf(info.row.original, now)
-          return <StatusBadge status={live} />
+          return (
+            <div className="flex flex-col items-start gap-0.5">
+              <StatusBadge status={live} />
+              <span className="text-[10px] text-muted-foreground">
+                stored: {info.row.original.status ?? "pending"}
+              </span>
+            </div>
+          )
         },
       }),
       helper.display({
         id: "actions",
         header: "Actions",
         cell: (info) => (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="rounded-md"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(info.row.original)
-            }}
-          >
-            Delete
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-md"
+              onClick={() => openDialog(info.row.original)}
+            >
+              Change
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="rounded-md"
+              onClick={() => onDelete(info.row.original)}
+            >
+              Delete
+            </Button>
+          </div>
         ),
       }),
     ],
@@ -126,6 +157,9 @@ export function TeacherAllocationTable({
     columns,
     data,
   })
+
+  const currentStatus: AllocationStatus =
+    (selected?.status ?? "pending") as AllocationStatus
 
   return (
     <div className="space-y-2">
@@ -153,29 +187,64 @@ export function TeacherAllocationTable({
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => {
-                const live = liveOf(row.original, now)
-                const clickable = row.original.status === "pending"
-                return (
-                  <tr
-                    key={row.id}
-                    className={`border-b last:border-0 ${
-                      clickable ? "cursor-pointer hover:bg-muted/40" : ""
-                    }`}
-                    onClick={clickable ? () => handleRowClick(row.original) : undefined}
-                  >
-                    {row.getAllCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-2">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })
+              table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="border-b last:border-0">
+                  {row.getAllCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-2">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Status</DialogTitle>
+            <DialogDescription>
+              {selected
+                ? `Set the status for ${selected.teacher_name} — ${selected.subject_name} (${fmtTime(selected.start_time)}–${fmtTime(selected.end_time)}).`
+                : "Select a status for this allocation."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selected ? (
+            <div className="space-y-3">
+              <div className="text-sm">
+                Current stored status: <StatusBadge status={currentStatus} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ALL_STATUSES.map((s) => {
+                  const c = statusColors[s]
+                  const isCurrent = s === currentStatus
+                  return (
+                    <Button
+                      key={s}
+                      variant="outline"
+                      className={`rounded-md border ${c.border} ${c.text} ${c.bg} hover:opacity-80`}
+                      disabled={busy || isCurrent}
+                      onClick={() => pickStatus(s)}
+                    >
+                      {isCurrent ? `${c.label} (current)` : `Set ${c.label}`}
+                    </Button>
+                  )
+                })}
+              </div>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" className="rounded-md" />}>
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
