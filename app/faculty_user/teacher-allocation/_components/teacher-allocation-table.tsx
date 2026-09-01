@@ -30,14 +30,21 @@ function liveOf(row: AllocationRow, now: Date): AllocationStatus {
   return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
 }
 
-function StatusBadge({ status }: { status: AllocationStatus }) {
+function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
   const c = statusColors[status]
+  const interactive = !!onClick
   return (
-    <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text} ${c.border}`}
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!interactive || busy}
+      title={interactive ? "Click to change status" : undefined}
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text} ${c.border} ${
+        interactive ? "cursor-pointer hover:opacity-80" : "cursor-default"
+      }`}
     >
       {c.label}
-    </span>
+    </button>
   )
 }
 
@@ -67,7 +74,7 @@ export function TeacherAllocationTable({
     return () => clearInterval(t)
   }, [])
 
-  async function handleCycle(row: AllocationRow) {
+  async function handleBadgeClick(row: AllocationRow) {
     setError(null)
     const current = (row.status ?? "pending") as AllocationStatus
     const next = nextOf(current)
@@ -99,41 +106,30 @@ export function TeacherAllocationTable({
         id: "status",
         header: "Status",
         cell: (info) => {
-          const live = liveOf(info.row.original, now)
-          return <StatusBadge status={live} />
+          const row = info.row.original
+          const live = liveOf(row, now)
+          return (
+            <StatusBadge
+              status={live}
+              onClick={() => handleBadgeClick(row)}
+              busy={busyId === row.id}
+            />
+          )
         },
       }),
       helper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => {
-          const row = info.row.original
-          const current = (row.status ?? "pending") as AllocationStatus
-          const next = nextOf(current)
-          const nextColors = statusColors[next]
-          const busy = busyId === row.id
-          return (
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className={`rounded-md border ${nextColors.border} ${nextColors.text} ${nextColors.bg} hover:opacity-80`}
-                disabled={busy}
-                onClick={() => handleCycle(row)}
-              >
-                {busy ? "Saving…" : `Set ${next}`}
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="rounded-md"
-                onClick={() => onDelete(row)}
-              >
-                Delete
-              </Button>
-            </div>
-          )
-        },
+        cell: (info) => (
+          <Button
+            size="sm"
+            variant="destructive"
+            className="rounded-md"
+            onClick={() => onDelete(info.row.original)}
+          >
+            Delete
+          </Button>
+        ),
       }),
     ],
     [busyId, now],
