@@ -32,8 +32,7 @@ export function computeLiveStatus(
   if (stored === "waiting") {
     // 'waiting' is "dean pre-approved" — it should stay 'waiting' until the
     // time window opens, at which point it auto-promotes to 'approved'.
-    const nowMs =
-      now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+    const nowMs = timeOfDayMs(now)
     const startMs = timeToMs(startTime)
     const endMs = timeToMs(endTime)
     const inside = nowMs >= startMs && nowMs <= endMs
@@ -45,15 +44,32 @@ export function computeLiveStatus(
   // If the time window is open, keep showing 'approved'.
   // If the time window has CLOSED (now > end), revert to 'pending' so the
   // dean knows the class session is over.
-  const nowMs =
-    now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+  const nowMs = timeOfDayMs(now)
   const endMs = timeToMs(endTime)
   if (nowMs <= endMs) return "approved"
   return "pending"
 }
 
+// Extract HH:MM:SS as ms-since-midnight in LOCAL time (matches `now` which
+// the caller passes in as the user's wall clock).
+function timeOfDayMs(t: Date): number {
+  return (
+    t.getHours() * 3600_000 +
+    t.getMinutes() * 60_000 +
+    t.getSeconds() * 1000
+  )
+}
+
+// Extract HH:MM:SS as ms-since-midnight using UTC components. The DB stores
+// Time-of-day with no timezone, and we always write the value with an
+// explicit `Date.UTC(...)` in `create.ts`, so reading via UTC keeps the
+// round-trip stable across server timezones.
 function timeToMs(t: Date): number {
-  return t.getHours() * 3600_000 + t.getMinutes() * 60_000 + t.getSeconds() * 1000
+  return (
+    t.getUTCHours() * 3600_000 +
+    t.getUTCMinutes() * 60_000 +
+    t.getUTCSeconds() * 1000
+  )
 }
 
 /**

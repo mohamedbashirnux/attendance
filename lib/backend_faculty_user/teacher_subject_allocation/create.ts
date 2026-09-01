@@ -34,12 +34,22 @@ export async function createAllocation(formData: FormData) {
     })
     if (!sc) return { error: "Subject is not assigned to the selected class" }
 
+    // Build a Date that represents the given wall-clock time-of-day in UTC.
+    // MySQL's `Time` column has no timezone, so we treat the HH:MM the user
+    // picked as a literal "HH:MM of the day" and store it that way, ignoring
+    // server local timezone. Using `1970-01-01THH:MM:00Z` makes the round-trip
+    // through Prisma stable across server timezones.
+    const [sh, sm] = parsed.data.start_time.split(":")
+    const [eh, em] = parsed.data.end_time.split(":")
+    const startUtc = new Date(Date.UTC(1970, 0, 1, Number(sh), Number(sm), 0))
+    const endUtc = new Date(Date.UTC(1970, 0, 1, Number(eh), Number(em), 0))
+
     await prisma.teacher_subject_allocation.create({
       data: {
         teacher_id: parsed.data.teacher_id,
         subject_class_id: sc.id,
-        start_time: new Date(`1970-01-01T${parsed.data.start_time}:00`),
-        end_time: new Date(`1970-01-01T${parsed.data.end_time}:00`),
+        start_time: startUtc,
+        end_time: endUtc,
       },
     })
   } catch {

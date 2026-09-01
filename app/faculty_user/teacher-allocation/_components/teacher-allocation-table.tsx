@@ -47,16 +47,9 @@ function hintFor(
   now: Date
 ): string | null {
   const live = liveOf(row, now)
-  const startMs =
-    new Date(row.start_time).getHours() * 3600_000 +
-    new Date(row.start_time).getMinutes() * 60_000 +
-    new Date(row.start_time).getSeconds() * 1000
-  const endMs =
-    new Date(row.end_time).getHours() * 3600_000 +
-    new Date(row.end_time).getMinutes() * 60_000 +
-    new Date(row.end_time).getSeconds() * 1000
-  const nowMs =
-    now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+  const startMs = utcTimeMs(row.start_time)
+  const endMs = utcTimeMs(row.end_time)
+  const nowMs = localTimeMs(now)
 
   if (live === "pending") {
     // Countdown to start_time
@@ -74,6 +67,17 @@ function hintFor(
   const diff = endMs - nowMs
   if (diff <= 0) return "Session ended"
   return `Class ends in ${fmtCountdown(diff)}`
+}
+
+// UTC-based reader (the DB Time field is stored as UTC; see create.ts).
+function utcTimeMs(v: string | Date): number {
+  const d = new Date(v)
+  return d.getUTCHours() * 3600_000 + d.getUTCMinutes() * 60_000 + d.getUTCSeconds() * 1000
+}
+
+// Local-based reader for the user's `now`.
+function localTimeMs(d: Date): number {
+  return d.getHours() * 3600_000 + d.getMinutes() * 60_000 + d.getSeconds() * 1000
 }
 
 function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
@@ -105,24 +109,17 @@ function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onCl
 // - click on 'approved' -> 'pending'  (reset)
 function nextOnClick(
   current: AllocationStatus,
-  startTime: Date,
-  endTime: Date,
+  startTime: Date | string,
+  endTime: Date | string,
   now: Date
 ): AllocationStatus {
   if (current === "waiting") return "approved"
   if (current === "approved") return "pending"
 
   // current === "pending"
-  const nowMs =
-    now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
-  const startMs =
-    startTime.getHours() * 3600_000 +
-    startTime.getMinutes() * 60_000 +
-    startTime.getSeconds() * 1000
-  const endMs =
-    endTime.getHours() * 3600_000 +
-    endTime.getMinutes() * 60_000 +
-    endTime.getSeconds() * 1000
+  const nowMs = localTimeMs(now)
+  const startMs = utcTimeMs(startTime)
+  const endMs = utcTimeMs(endTime)
 
   // Inside the window -> dean + time both ok -> go straight to approved
   if (nowMs >= startMs && nowMs <= endMs) return "approved"
