@@ -1,9 +1,6 @@
-// Pure helpers for teacher allocation status (no "use server" directive so this
-// file can be safely imported by Client Components).
-
-import { revalidatePath } from "next/cache"
-import { prisma } from "@/lib/prisma"
-import { auth } from "@/lib/backend_super_admin/auth/auth"
+// Pure helpers for teacher allocation status.
+// No imports from next/cache / prisma / auth here — this file must be safe
+// to import from a Client Component.
 
 export type LiveStatus = "pending" | "waiting" | "approved"
 
