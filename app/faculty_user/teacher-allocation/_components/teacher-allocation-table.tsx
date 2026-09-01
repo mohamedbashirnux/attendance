@@ -30,6 +30,52 @@ function liveOf(row: AllocationRow, now: Date): AllocationStatus {
   return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
 }
 
+// Human-readable countdown like "2h 47m" or "47m" or "12 min".
+// Returns null if `ms` is non-positive (i.e. the moment has arrived).
+function fmtCountdown(ms: number): string | null {
+  if (ms <= 0) return null
+  const totalMin = Math.floor(ms / 60_000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h > 0) return `${h}h ${m}m`
+  return `${m} min`
+}
+
+// Build the small hint text shown under the badge for the current live state.
+function hintFor(
+  row: AllocationRow,
+  now: Date
+): string | null {
+  const live = liveOf(row, now)
+  const startMs =
+    new Date(row.start_time).getHours() * 3600_000 +
+    new Date(row.start_time).getMinutes() * 60_000 +
+    new Date(row.start_time).getSeconds() * 1000
+  const endMs =
+    new Date(row.end_time).getHours() * 3600_000 +
+    new Date(row.end_time).getMinutes() * 60_000 +
+    new Date(row.end_time).getSeconds() * 1000
+  const nowMs =
+    now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
+
+  if (live === "pending") {
+    // Countdown to start_time
+    const diff = startMs - nowMs
+    if (diff <= 0) return "Class can be allowed now"
+    return `Class starts in ${fmtCountdown(diff)}`
+  }
+  if (live === "waiting") {
+    // Countdown to start_time (when it will auto-approve)
+    const diff = startMs - nowMs
+    if (diff <= 0) return "Auto-approving now"
+    return `Auto-approve in ${fmtCountdown(diff)}`
+  }
+  // live === "approved"
+  const diff = endMs - nowMs
+  if (diff <= 0) return "Session ended"
+  return `Class ends in ${fmtCountdown(diff)}`
+}
+
 function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
   const c = statusColors[status]
   const interactive = !!onClick
@@ -150,12 +196,18 @@ export function TeacherAllocationTable({
         cell: (info) => {
           const row = info.row.original
           const live = liveOf(row, now)
+          const hint = hintFor(row, now)
           return (
-            <StatusBadge
-              status={live}
-              onClick={mounted ? () => handleBadgeClick(row) : undefined}
-              busy={busyId === row.id}
-            />
+            <div className="flex flex-col items-start gap-0.5">
+              <StatusBadge
+                status={live}
+                onClick={mounted ? () => handleBadgeClick(row) : undefined}
+                busy={busyId === row.id}
+              />
+              {hint ? (
+                <span className="text-[10px] text-muted-foreground">{hint}</span>
+              ) : null}
+            </div>
           )
         },
       }),
