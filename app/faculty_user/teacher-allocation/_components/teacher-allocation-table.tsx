@@ -26,8 +26,7 @@ function fmtTime(v: string): string {
   return t.slice(0, 5)
 }
 
-function liveOf(row: AllocationRow, now: Date | null): AllocationStatus {
-  if (!now) return (row.status ?? "pending") as AllocationStatus
+function liveOf(row: AllocationRow, now: Date): AllocationStatus {
   return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
 }
 
@@ -62,13 +61,12 @@ function nextOnClick(
   current: AllocationStatus,
   startTime: Date,
   endTime: Date,
-  now: Date | null
+  now: Date
 ): AllocationStatus {
   if (current === "waiting") return "approved"
   if (current === "approved") return "pending"
 
   // current === "pending"
-  if (!now) return "waiting"
   const nowMs =
     now.getHours() * 3600_000 + now.getMinutes() * 60_000 + now.getSeconds() * 1000
   const startMs =
@@ -90,18 +88,21 @@ export function TeacherAllocationTable({
   data,
   onDelete,
   onChanged,
+  serverNow,
 }: {
   data: AllocationRow[]
   onDelete: (r: AllocationRow) => void
   onChanged: () => void
+  serverNow: string
 }) {
   const [busyId, setBusyId] = React.useState<number | null>(null)
   const [error, setError] = React.useState<string | null>(null)
-  // Track the current "now" on the client only. Start with null so SSR and
-  // the first client render agree (avoids a hydration mismatch), then set
-  // it in an effect and refresh every 30s.
-  const [now, setNow] = React.useState<Date | null>(null)
-  // Mounted flag so the badge is non-interactive during SSR / first paint.
+  // 'now' is seeded from the server-rendered ISO string so the first client
+  // render uses the same 'now' as the server. After mount we use the
+  // client's clock and refresh every 30s. This avoids a visible 'blink'
+  // on refresh where a row with stored 'approved' briefly reverts to
+  // 'pending' (or vice versa) when end_time has passed.
+  const [now, setNow] = React.useState<Date>(() => new Date(serverNow))
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => {
     setMounted(true)

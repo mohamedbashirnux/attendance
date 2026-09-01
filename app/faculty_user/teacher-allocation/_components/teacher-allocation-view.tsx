@@ -23,9 +23,10 @@ type Props = {
   allocations: AllocationRow[]
   classInfo: ClassViewInfo | null
   classId: string
+  serverNow: string
 }
 
-export function TeacherAllocationView({ allocations, classInfo, classId }: Props) {
+export function TeacherAllocationView({ allocations, classInfo, classId, serverNow }: Props) {
   const router = useRouter()
   const [deleting, setDeleting] = React.useState<AllocationRow | null>(null)
 
@@ -82,6 +83,7 @@ export function TeacherAllocationView({ allocations, classInfo, classId }: Props
         data={allocations}
         onDelete={(r) => setDeleting(r)}
         onChanged={() => router.refresh()}
+        serverNow={serverNow}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null) }}>
