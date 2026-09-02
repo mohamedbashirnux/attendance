@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
+import {
+  studyModeOptions,
+  semesterOptions,
+  labelFor,
+} from "@/lib/backend_faculty_user/class/enums"
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
@@ -56,8 +61,8 @@ export async function GET(req: NextRequest) {
     class_name: a.subject_class.classes.class_name,
     department_name: a.subject_class.classes.departments.department_name,
     faculty_name: a.subject_class.classes.departments.faculty.faculty_name,
-    study_mode: a.subject_class.classes.study_mode,
-    semester: a.subject_class.classes.semester,
+    study_mode: labelFor(studyModeOptions, a.subject_class.classes.study_mode),
+    semester: labelFor(semesterOptions, a.subject_class.classes.semester),
     academic_year: a.subject_class.classes.academic_year,
     subject_id: a.subject_class.subjects.id,
     subject_name: a.subject_class.subjects.subject_name,
