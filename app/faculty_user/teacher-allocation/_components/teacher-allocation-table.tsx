@@ -43,26 +43,43 @@ function fmtCountdown(ms: number): string | null {
 }
 
 // Build the small hint text shown under the badge for the current live state.
+//
+// All three statuses share the same rule for the time text:
+//   - If we're before today's start     -> "in 3h 13m"
+//   - If we're inside today's window    -> "ends in 1h 57m"
+//   - If we're after today's end        -> "in 19h 31m (tomorrow)"
+//
+// The wording around the time is per-status so the dean knows what action
+// to take (or what the system is doing automatically).
 function hintFor(row: AllocationRow, now: Date): string | null {
   const live = liveOf(row, now)
   const startMs = timeToMs(row.start_time)
   const endMs = timeToMs(row.end_time)
   const nowMs = nowToMs(now)
+  const dayMs = 24 * 3600_000
 
-  if (live === "pending") {
-    const diff = startMs - nowMs
-    if (diff <= 0) return "Class can be allowed now"
-    return `Class starts in ${fmtCountdown(diff)}`
+  // Where are we in the day vs. the class window?
+  // beforeStart, inside, afterEnd, plus a flag for whether the next
+  // occurrence is on the same day or "tomorrow" (next day).
+  let diff: number
+  let tomorrow = false
+  if (nowMs < startMs) {
+    diff = startMs - nowMs
+  } else if (nowMs <= endMs) {
+    diff = endMs - nowMs
+  } else {
+    diff = dayMs - nowMs + startMs
+    tomorrow = true
   }
-  if (live === "waiting") {
-    const diff = startMs - nowMs
-    if (diff <= 0) return "Auto-approving now"
-    return `Auto-approve in ${fmtCountdown(diff)}`
-  }
+
+  const countdown = fmtCountdown(diff)
+  const when = countdown ? `in ${countdown}${tomorrow ? " (tomorrow)" : ""}` : "now"
+
+  if (live === "pending") return `Class starts ${when}`
+  if (live === "waiting") return `Auto-approve ${when}`
   // live === "approved"
-  const diff = endMs - nowMs
-  if (diff <= 0) return "Session ended"
-  return `Class ends in ${fmtCountdown(diff)}`
+  if (nowMs > endMs) return `Next class ${when}`
+  return `Class ends ${when}`
 }
 
 function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
