@@ -13,17 +13,20 @@ export type AllocationStatus = "pending" | "waiting" | "approved"
  * because that is what the user sees.
  *
  * Rules:
- *  - "pending"  + inside the time window -> "approved" (the class is
- *                  happening now, so it's effectively live-approved even
- *                  though the dean hasn't allowed it yet).
- *  - "pending"  + outside the window      -> "pending" (yellow).
+ *  - "pending"  is always "pending" (yellow). The dean must explicitly
+ *                 allow it (click -> "waiting") before a teacher can take
+ *                 attendance, even if the time window is currently open.
  *  - "waiting"  + inside the time window  -> "approved" (dean allowed
- *                  AND time is right).
+ *                 AND time is right — teacher can take attendance now).
  *  - "waiting"  + outside the window      -> "waiting" (dean allowed,
- *                  waiting for the window to open).
+ *                 waiting for the window to open).
  *  - "approved" + inside the window      -> "approved".
  *  - "approved" + outside (past)         -> "pending" (session ended,
- *                  the dean must re-allow for the next session).
+ *                 the dean must re-allow for the next session).
+ *
+ * After a successful attendance submission the API resets the stored
+ * status to "pending", so even if the time is still inside the window
+ * the teacher cannot submit a second attendance for the same session.
  *
  * Day of week and timetable are NOT considered.
  */
@@ -34,14 +37,13 @@ export function computeLiveStatus(
   now: Date = new Date()
 ): AllocationStatus {
   const stored = (storedStatus ?? "pending") as AllocationStatus
+  if (stored === "pending") return "pending"
+
   const nowMs = nowToMs(now)
   const startMs = timeToMs(startTime)
   const endMs = timeToMs(endTime)
   const inside = nowMs >= startMs && nowMs <= endMs
 
-  if (stored === "pending") {
-    return inside ? "approved" : "pending"
-  }
   if (stored === "waiting") {
     return inside ? "approved" : "waiting"
   }

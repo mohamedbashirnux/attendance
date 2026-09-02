@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
+import { computeLiveStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
+import { toTimeString } from "@/lib/backend_faculty_user/teacher_subject_allocation/time"
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
@@ -48,7 +50,13 @@ export async function POST(req: NextRequest) {
     where: { teacher_id: teacherId },
     include: {
       teacher_subject_allocation: {
-        select: { subject_class_id: true, status: true },
+        select: {
+          id: true,
+          subject_class_id: true,
+          status: true,
+          start_time: true,
+          end_time: true,
+        },
       },
     },
   })
@@ -83,7 +91,9 @@ export async function POST(req: NextRequest) {
     subjectClassId = sc.id
   }
 
-  // 3. Verify the teacher is allocated to this subject_class AND it's approved
+  // 3. Verify the teacher is allocated to this subject_class AND the live
+  //    status is "approved" (dean allowed + currently inside the time
+  //    window, OR stored as approved and still inside the window).
   const allocation = teacher.teacher_subject_allocation.find(
     (a) => a.subject_class_id === subjectClassId
   )
@@ -93,10 +103,15 @@ export async function POST(req: NextRequest) {
       { status: 403, headers: corsHeaders }
     )
   }
-  if (allocation.status !== "approved") {
+  const liveStatus = computeLiveStatus(
+    allocation.status,
+    toTimeString(allocation.start_time),
+    toTimeString(allocation.end_time)
+  )
+  if (liveStatus !== "approved") {
     return NextResponse.json(
       {
-        error: `This allocation is not approved yet (current status: ${allocation.status}). You can only take attendance for approved classes.`,
+        error: `This allocation is not approved right now (current status: ${allocation.status}, live: ${liveStatus}). You can only take attendance when the class is approved and inside its time window.`,
       },
       { status: 403, headers: corsHeaders }
     )
@@ -209,6 +224,14 @@ export async function POST(req: NextRequest) {
           })),
         })
       }
+
+      // Lock the allocation back to "pending" so the teacher cannot
+      // submit a second attendance for the same session. The dean must
+      // re-allow (pending -> waiting -> approved) for the next session.
+      await tx.teacher_subject_allocation.update({
+        where: { id: allocation.id },
+        data: { status: "pending" },
+      })
 
       return session
     })
