@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
 
+// Map Prisma's TS enum names (with underscores) to the DB strings
+// (with spaces) used in the `absences.excuse` column. The mobile app
+// uses the same spaced strings when posting attendance, so we return
+// the same form to keep things consistent.
+const EXCUSE_LABELS: Record<string, string> = {
+  Family_Emergency: "Family Emergency",
+  Medical_Appointment: "Medical Appointment",
+  Personal_Reason: "Personal Reason",
+  Official_Duty: "Official Duty",
+  Other: "Other",
+  No_Excuse: "No Excuse",
+}
+
+function excuseLabel(v: string | null): string {
+  if (!v) return "No Excuse"
+  return EXCUSE_LABELS[v] ?? v
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
 }
@@ -134,7 +152,7 @@ export async function GET(req: NextRequest) {
         a.absence_date instanceof Date
           ? a.absence_date.toISOString().slice(0, 10)
           : String(a.absence_date).slice(0, 10),
-      excuse: a.excuse ?? "No_Excuse",
+      excuse: excuseLabel(a.excuse),
     })
     absentDetailsByStudent.set(a.student_id, list)
   }

@@ -80,10 +80,16 @@ export async function GET(
   }
 
   // 4. Fetch only the students in this class — read only, id + name
-  //    Sorted alphabetically by name so teacher/student see the same number
+  //    Sorted alphabetically by name so teacher/student see the same number.
+  //    We return both:
+  //      - "id":  the DB primary key (students.id, integer). The mobile
+  //               needs this to build the POST /attendance body where
+  //               absences[i].student_id must be the DB id.
+  //      - "student_id": the human-readable id string (e.g. "S001").
   const students = await prisma.students.findMany({
     where: { class_id: classIdNum },
     select: {
+      id: true,
       student_id: true,
       full_name: true,
     },
@@ -95,7 +101,11 @@ export async function GET(
       class_id: cls.id,
       class_name: cls.class_name,
       count: students.length,
-      students,
+      students: students.map((s) => ({
+        id: s.id,
+        student_id: s.student_id,
+        full_name: s.full_name,
+      })),
     },
     { status: 200, headers: corsHeaders }
   )
