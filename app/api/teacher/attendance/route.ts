@@ -179,6 +179,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  console.log("[attendance] parsed absentEntries:", JSON.stringify(absentEntries, null, 2))
+
   const absentIds = absentEntries.map((e) => e.student_id)
   const absentCount = absentIds.length
   const presentCount = totalStudents - absentCount
@@ -253,18 +255,20 @@ export async function POST(req: NextRequest) {
       })
 
       if (absentEntries.length > 0) {
+        const absenceData = absentEntries.map((e) => ({
+          student_id: e.student_id,
+          subject_class_id: subjectClassId,
+          attendance_session_id: session.id,
+          absence_date: absenceDateOnly,
+          // excuse: convert the spaced form ("Family Emergency") to
+          // the Prisma TS enum form ("Family_Emergency"). Prisma
+          // writes it back to the DB column as the spaced string
+          // via @map. Fall back to "No_Excuse" when none given.
+          excuse: toExcuseEnum(e.excuse) as any,
+        }))
+        console.log("[attendance] inserting absences:", JSON.stringify(absenceData, null, 2))
         await tx.absences.createMany({
-          data: absentEntries.map((e) => ({
-            student_id: e.student_id,
-            subject_class_id: subjectClassId,
-            attendance_session_id: session.id,
-            absence_date: absenceDateOnly,
-            // excuse: convert the spaced form ("Family Emergency") to
-            // the Prisma TS enum form ("Family_Emergency"). Prisma
-            // writes it back to the DB column as the spaced string
-            // via @map. Fall back to "No_Excuse" when none given.
-            excuse: toExcuseEnum(e.excuse) as any,
-          })),
+          data: absenceData,
         })
       }
 
