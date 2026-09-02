@@ -13,7 +13,15 @@ type Body = {
   class_id?: number
   subject_id?: number
   session_datetime?: string
+  // Legacy: just a list of student ids, all stored with excuse = "No_Excuse".
   absent_student_ids?: (number | string)[]
+  // Preferred: each absent entry can carry an excuse reason. The value
+  // must match one of the `absences_excuse` enum members in the DB:
+  //   "Family Emergency", "Medical Appointment", "Personal Reason",
+  //   "Official Duty", "Other", "No Excuse"
+  // Anything else is rejected by the DB enum, the transaction rolls
+  // back, and the response is 500 "Could not save attendance".
+  absences?: { student_id: number | string; excuse?: string }[]
   notes?: string
 }
 
@@ -132,16 +140,34 @@ export async function POST(req: NextRequest) {
     where: { class_id: subjectClass.class_id },
   })
 
-  // 5. Parse the absent list (deduped)
-  const absentIds = Array.isArray(body.absent_student_ids)
-    ? [
-        ...new Set(
-          body.absent_student_ids
-            .map((v) => Number(v))
-            .filter((n) => Number.isInteger(n) && n > 0)
-        ),
-      ]
-    : []
+  // 5. Parse the absent list. Two shapes are accepted:
+  //    - body.absences: [{ student_id, excuse }] (preferred; excuse stored)
+  //    - body.absent_student_ids: [...] (legacy; excuse defaults to No_Excuse)
+  // Duplicates are removed by student_id, keeping the first occurrence.
+  type AbsentEntry = { student_id: number; excuse: string | null }
+  const absentEntries: AbsentEntry[] = []
+  const seen = new Set<number>()
+
+  if (Array.isArray(body.absences)) {
+    for (const a of body.absences) {
+      const sid = Number(a?.student_id)
+      if (!Number.isInteger(sid) || sid <= 0) continue
+      if (seen.has(sid)) continue
+      seen.add(sid)
+      const excuse = typeof a?.excuse === "string" && a.excuse.length > 0 ? a.excuse : null
+      absentEntries.push({ student_id: sid, excuse })
+    }
+  } else if (Array.isArray(body.absent_student_ids)) {
+    for (const v of body.absent_student_ids) {
+      const sid = Number(v)
+      if (!Number.isInteger(sid) || sid <= 0) continue
+      if (seen.has(sid)) continue
+      seen.add(sid)
+      absentEntries.push({ student_id: sid, excuse: null })
+    }
+  }
+
+  const absentIds = absentEntries.map((e) => e.student_id)
   const absentCount = absentIds.length
   const presentCount = totalStudents - absentCount
 
@@ -214,13 +240,18 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      if (absentIds.length > 0) {
+      if (absentEntries.length > 0) {
         await tx.absences.createMany({
-          data: absentIds.map((studentId) => ({
-            student_id: studentId,
+          data: absentEntries.map((e) => ({
+            student_id: e.student_id,
             subject_class_id: subjectClassId,
             attendance_session_id: session.id,
             absence_date: absenceDateOnly,
+            // When excuse is null we omit the field so the DB default
+            // "No_Excuse" is used. When set, the value must be one of
+            // the absences_excuse enum members — anything else makes
+            // Prisma throw and the whole transaction rolls back.
+            ...(e.excuse ? { excuse: e.excuse as any } : {}),
           })),
         })
       }
