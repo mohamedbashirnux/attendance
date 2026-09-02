@@ -12,6 +12,15 @@ import {
 } from "@tanstack/table-core"
 import type { AllocationRow } from "@/lib/backend_faculty_user/teacher_subject_allocation/fetch"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   computeLiveStatus,
   statusColors,
@@ -19,6 +28,7 @@ import {
 } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
 import { nowToMs, timeToMs } from "@/lib/backend_faculty_user/teacher_subject_allocation/time"
 import { changeStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
+import { updateAllocationTime } from "@/lib/backend_faculty_user/teacher_subject_allocation/update-time"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
@@ -139,6 +149,7 @@ export function TeacherAllocationTable({
 }) {
   const [busyId, setBusyId] = React.useState<number | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [editing, setEditing] = React.useState<AllocationRow | null>(null)
   // 'now' is seeded from the server-rendered ISO string so the first client
   // render uses the same 'now' as the server. After mount we use the
   // client's clock and refresh every 30s.
@@ -203,20 +214,37 @@ export function TeacherAllocationTable({
       helper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="rounded-md"
-            onClick={() => onDelete(info.row.original)}
-          >
-            Delete
-          </Button>
-        ),
+        cell: (info) => {
+          const row = info.row.original
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-md"
+                onClick={() => setEditing(row)}
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="rounded-md"
+                onClick={() => onDelete(row)}
+              >
+                Delete
+              </Button>
+            </div>
+          )
+        },
       }),
     ],
     [busyId, now],
   )
+
+  // Note: the columns reference `setEditing` (stable) and `onDelete`/`onChanged`
+  // (stable from parent), so the `editing` state itself doesn't need to be a
+  // dependency — opening/closing the dialog doesn't affect column rendering.
 
   const table = useTable({
     features: tableFeatures({ ...coreFeatures, coreRowModel: createCoreRowModel() }),
@@ -225,44 +253,142 @@ export function TeacherAllocationTable({
   })
 
   return (
-    <div className="space-y-2">
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="overflow-hidden rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b">
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-2 text-left font-medium">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                  No allocations yet.
-                </td>
-              </tr>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b last:border-0">
-                  {row.getAllCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-2">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
+    <>
+      <div className="space-y-2">
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <div className="overflow-hidden rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="px-4 py-2 text-left font-medium">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
                   ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
+                    No allocations yet.
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b last:border-0">
+                    {row.getAllCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-2">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <EditTimeDialog
+        row={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null)
+          onChanged()
+        }}
+      />
+    </>
+  )
+}
+
+// Dialog for editing ONLY start_time and end_time of one allocation.
+function EditTimeDialog({
+  row,
+  onClose,
+  onSaved,
+}: {
+  row: AllocationRow | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [start, setStart] = React.useState("")
+  const [end, setEnd] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  // Seed the inputs whenever a new row is opened.
+  React.useEffect(() => {
+    if (row) {
+      setStart(row.start_time.slice(0, 5))
+      setEnd(row.end_time.slice(0, 5))
+      setError(null)
+    }
+  }, [row])
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!row) return
+    setBusy(true)
+    setError(null)
+    const fd = new FormData()
+    fd.set("id", String(row.id))
+    fd.set("start_time", start)
+    fd.set("end_time", end)
+    const res = await updateAllocationTime(fd)
+    setBusy(false)
+    if (res && "error" in res) {
+      setError(res.error ?? "Could not save")
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <Dialog open={!!row} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Time</DialogTitle>
+          <DialogDescription>
+            {row ? `${row.teacher_code} — ${row.subject_name}` : null}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSave} className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Start</span>
+              <Input
+                type="time"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">End</span>
+              <Input
+                type="time"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                required
+              />
+            </label>
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <DialogFooter className="-mx-4 -mb-4 mt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
