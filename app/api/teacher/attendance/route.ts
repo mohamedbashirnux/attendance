@@ -25,6 +25,18 @@ type Body = {
   notes?: string
 }
 
+// The mobile sends the human-readable excuse ("Family Emergency").
+// Prisma's TS enum members don't allow spaces, so it expects the
+// underscored form ("Family_Emergency"). The DB column stores the
+// spaced form (the @map target), so the round-trip is:
+//   mobile -> "Family Emergency"
+//   route  -> "Family_Emergency" (Prisma accepts)
+//   DB     -> "Family Emergency" (stored as-is via @map)
+function toExcuseEnum(v: string | null | undefined): string {
+  if (!v) return "No_Excuse"
+  return v.replace(/ /g, "_")
+}
+
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization")
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null
@@ -247,10 +259,11 @@ export async function POST(req: NextRequest) {
             subject_class_id: subjectClassId,
             attendance_session_id: session.id,
             absence_date: absenceDateOnly,
-            // excuse is one of the `absences_excuse` enum values from
-            // the `absences` table column. Anything else makes the DB
-            // throw and the whole transaction rolls back.
-            excuse: (e.excuse ?? "No Excuse") as any,
+            // excuse: convert the spaced form ("Family Emergency") to
+            // the Prisma TS enum form ("Family_Emergency"). Prisma
+            // writes it back to the DB column as the spaced string
+            // via @map. Fall back to "No_Excuse" when none given.
+            excuse: toExcuseEnum(e.excuse) as any,
           })),
         })
       }
