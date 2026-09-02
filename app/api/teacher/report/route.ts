@@ -2,22 +2,30 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
 
-// Map Prisma's TS enum names (with underscores) to the DB strings
-// (with spaces) used in the `absences.excuse` column. The mobile app
-// uses the same spaced strings when posting attendance, so we return
-// the same form to keep things consistent.
+// Map excuse values to the human-readable string the mobile expects.
+// Prisma's TS enum uses underscores ("Family_Emergency"); the underlying
+// DB column stores the spaced form ("Family Emergency") via @map. Either
+// form can come back depending on the path Prisma took (typed select vs
+// raw), so we cover both keys. Anything we don't recognize falls back
+// to "No Excuse" instead of echoing a raw underscored value back to the
+// mobile.
 const EXCUSE_LABELS: Record<string, string> = {
   Family_Emergency: "Family Emergency",
+  "Family Emergency": "Family Emergency",
   Medical_Appointment: "Medical Appointment",
+  "Medical Appointment": "Medical Appointment",
   Personal_Reason: "Personal Reason",
+  "Personal Reason": "Personal Reason",
   Official_Duty: "Official Duty",
+  "Official Duty": "Official Duty",
   Other: "Other",
   No_Excuse: "No Excuse",
+  "No Excuse": "No Excuse",
 }
 
-function excuseLabel(v: string | null): string {
+function excuseLabel(v: string | null | undefined): string {
   if (!v) return "No Excuse"
-  return EXCUSE_LABELS[v] ?? v
+  return EXCUSE_LABELS[v] ?? "No Excuse"
 }
 
 export async function OPTIONS() {
