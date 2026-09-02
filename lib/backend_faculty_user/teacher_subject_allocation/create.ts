@@ -36,9 +36,9 @@ export async function createAllocation(formData: FormData) {
 
     // Build a Date that represents the given wall-clock time-of-day in UTC.
     // MySQL's `Time` column has no timezone, so we treat the HH:MM the user
-    // picked as a literal "HH:MM of the day" and store it that way, ignoring
-    // server local timezone. Using `1970-01-01THH:MM:00Z` makes the round-trip
-    // through Prisma stable across server timezones.
+    // picked as a literal "HH:MM of the day" and store it as a UTC Date.
+    // On read, `time.ts#toTimeString` extracts the UTC components so the
+    // round-trip is lossless across server timezones.
     const [sh, sm] = parsed.data.start_time.split(":")
     const [eh, em] = parsed.data.end_time.split(":")
     const startUtc = new Date(Date.UTC(1970, 0, 1, Number(sh), Number(sm), 0))

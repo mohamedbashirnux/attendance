@@ -17,17 +17,18 @@ import {
   statusColors,
   type AllocationStatus,
 } from "@/lib/backend_faculty_user/teacher_subject_allocation/set-status"
+import { nowToMs, timeToMs } from "@/lib/backend_faculty_user/teacher_subject_allocation/time"
 import { changeStatus } from "@/lib/backend_faculty_user/teacher_subject_allocation/actions"
 
 const helper = createColumnHelper<TableFeatures, AllocationRow>()
 
+// Display the time as "HH:MM" (we already store "HH:MM:SS" strings).
 function fmtTime(v: string): string {
-  const t = v.includes("T") ? v.split("T")[1] : v
-  return t.slice(0, 5)
+  return v.slice(0, 5)
 }
 
 function liveOf(row: AllocationRow, now: Date): AllocationStatus {
-  return computeLiveStatus(row.status, new Date(row.start_time), new Date(row.end_time), now)
+  return computeLiveStatus(row.status, row.start_time, row.end_time, now)
 }
 
 // Human-readable countdown like "2h 47m" or "47m" or "12 min".
@@ -42,23 +43,18 @@ function fmtCountdown(ms: number): string | null {
 }
 
 // Build the small hint text shown under the badge for the current live state.
-function hintFor(
-  row: AllocationRow,
-  now: Date
-): string | null {
+function hintFor(row: AllocationRow, now: Date): string | null {
   const live = liveOf(row, now)
-  const startMs = utcTimeMs(row.start_time)
-  const endMs = utcTimeMs(row.end_time)
-  const nowMs = localTimeMs(now)
+  const startMs = timeToMs(row.start_time)
+  const endMs = timeToMs(row.end_time)
+  const nowMs = nowToMs(now)
 
   if (live === "pending") {
-    // Countdown to start_time
     const diff = startMs - nowMs
     if (diff <= 0) return "Class can be allowed now"
     return `Class starts in ${fmtCountdown(diff)}`
   }
   if (live === "waiting") {
-    // Countdown to start_time (when it will auto-approve)
     const diff = startMs - nowMs
     if (diff <= 0) return "Auto-approving now"
     return `Auto-approve in ${fmtCountdown(diff)}`
@@ -67,17 +63,6 @@ function hintFor(
   const diff = endMs - nowMs
   if (diff <= 0) return "Session ended"
   return `Class ends in ${fmtCountdown(diff)}`
-}
-
-// UTC-based reader (the DB Time field is stored as UTC; see create.ts).
-function utcTimeMs(v: string | Date): number {
-  const d = new Date(v)
-  return d.getUTCHours() * 3600_000 + d.getUTCMinutes() * 60_000 + d.getUTCSeconds() * 1000
-}
-
-// Local-based reader for the user's `now`.
-function localTimeMs(d: Date): number {
-  return d.getHours() * 3600_000 + d.getMinutes() * 60_000 + d.getSeconds() * 1000
 }
 
 function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
@@ -103,27 +88,24 @@ function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onCl
 //
 // - click on 'pending':
 //     * inside [start, end]  -> 'approved'  (dean + time both ok)
-//     * before start         -> 'waiting'   (dean approved, waiting for time)
-//     * after end            -> 'waiting'   (re-arm for next session)
+//     * outside [start, end] -> 'waiting'   (dean approved, waiting for time)
 // - click on 'waiting'  -> 'approved' (force approval)
 // - click on 'approved' -> 'pending'  (reset)
 function nextOnClick(
   current: AllocationStatus,
-  startTime: Date | string,
-  endTime: Date | string,
+  startTime: string,
+  endTime: string,
   now: Date
 ): AllocationStatus {
   if (current === "waiting") return "approved"
   if (current === "approved") return "pending"
 
   // current === "pending"
-  const nowMs = localTimeMs(now)
-  const startMs = utcTimeMs(startTime)
-  const endMs = utcTimeMs(endTime)
+  const nowMs = nowToMs(now)
+  const startMs = timeToMs(startTime)
+  const endMs = timeToMs(endTime)
 
-  // Inside the window -> dean + time both ok -> go straight to approved
   if (nowMs >= startMs && nowMs <= endMs) return "approved"
-  // Otherwise just stage the dean's approval -> waiting
   return "waiting"
 }
 
@@ -142,9 +124,7 @@ export function TeacherAllocationTable({
   const [error, setError] = React.useState<string | null>(null)
   // 'now' is seeded from the server-rendered ISO string so the first client
   // render uses the same 'now' as the server. After mount we use the
-  // client's clock and refresh every 30s. This avoids a visible 'blink'
-  // on refresh where a row with stored 'approved' briefly reverts to
-  // 'pending' (or vice versa) when end_time has passed.
+  // client's clock and refresh every 30s.
   const [now, setNow] = React.useState<Date>(() => new Date(serverNow))
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => {
@@ -157,12 +137,7 @@ export function TeacherAllocationTable({
   async function handleBadgeClick(row: AllocationRow) {
     setError(null)
     const current = (row.status ?? "pending") as AllocationStatus
-    const next = nextOnClick(
-      current,
-      new Date(row.start_time),
-      new Date(row.end_time),
-      now
-    )
+    const next = nextOnClick(current, row.start_time, row.end_time, now)
     setBusyId(row.id)
     const res = await changeStatus(row.id, next)
     setBusyId(null)

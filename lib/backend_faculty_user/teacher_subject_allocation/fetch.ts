@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { toTimeString } from "@/lib/backend_faculty_user/teacher_subject_allocation/time"
 
 export type AllocationRow = {
   id: number
@@ -33,8 +34,8 @@ export async function getAllocations(): Promise<AllocationRow[]> {
     class_name: r.subject_class.classes.class_name,
     subject_id: r.subject_class.subject_id,
     subject_name: r.subject_class.subjects.subject_name,
-    start_time: r.start_time.toISOString(),
-    end_time: r.end_time.toISOString(),
+    start_time: toTimeString(r.start_time),
+    end_time: toTimeString(r.end_time),
     status: r.status,
   }))
 }
@@ -57,8 +58,8 @@ export async function getAllocationsByClass(classId: number): Promise<Allocation
     class_name: r.subject_class.classes.class_name,
     subject_id: r.subject_class.subject_id,
     subject_name: r.subject_class.subjects.subject_name,
-    start_time: r.start_time.toISOString(),
-    end_time: r.end_time.toISOString(),
+    start_time: toTimeString(r.start_time),
+    end_time: toTimeString(r.end_time),
     status: r.status,
   }))
 }
@@ -109,8 +110,8 @@ export async function getTeacherAllocationView(
       class_name: r.subject_class.classes.class_name,
       subject_id: r.subject_class.subject_id,
       subject_name: r.subject_class.subjects.subject_name,
-      start_time: r.start_time.toISOString(),
-      end_time: r.end_time.toISOString(),
+      start_time: toTimeString(r.start_time),
+      end_time: toTimeString(r.end_time),
       status: r.status,
     })),
   }
