@@ -12,14 +12,18 @@ export type AllocationStatus = "pending" | "waiting" | "approved"
  * `now` is the user's wall clock — we read it with the LOCAL accessors
  * because that is what the user sees.
  *
- * Rules (matches the user's spec):
- *  - If the stored status is "pending", live status is always "pending".
- *  - If the stored status is "waiting":
- *      - inside the time window  -> live status becomes "approved"
- *      - outside the time window -> live status stays "waiting"
- *  - If the stored status is "approved":
- *      - inside the time window  -> live status is "approved"
- *      - outside the time window -> live status reverts to "pending"
+ * Rules:
+ *  - "pending"  + inside the time window -> "approved" (the class is
+ *                  happening now, so it's effectively live-approved even
+ *                  though the dean hasn't allowed it yet).
+ *  - "pending"  + outside the window      -> "pending" (yellow).
+ *  - "waiting"  + inside the time window  -> "approved" (dean allowed
+ *                  AND time is right).
+ *  - "waiting"  + outside the window      -> "waiting" (dean allowed,
+ *                  waiting for the window to open).
+ *  - "approved" + inside the window      -> "approved".
+ *  - "approved" + outside (past)         -> "pending" (session ended,
+ *                  the dean must re-allow for the next session).
  *
  * Day of week and timetable are NOT considered.
  */
@@ -30,17 +34,17 @@ export function computeLiveStatus(
   now: Date = new Date()
 ): AllocationStatus {
   const stored = (storedStatus ?? "pending") as AllocationStatus
-  if (stored === "pending") return "pending"
-
   const nowMs = nowToMs(now)
   const startMs = timeToMs(startTime)
   const endMs = timeToMs(endTime)
   const inside = nowMs >= startMs && nowMs <= endMs
 
+  if (stored === "pending") {
+    return inside ? "approved" : "pending"
+  }
   if (stored === "waiting") {
     return inside ? "approved" : "waiting"
   }
-
   // stored === "approved"
   return nowMs <= endMs ? "approved" : "pending"
 }

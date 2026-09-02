@@ -54,13 +54,20 @@ function fmtCountdown(ms: number): string | null {
 
 // Build the small hint text shown under the badge for the current live state.
 //
-// All three statuses share the same rule for the time text:
-//   - If we're before today's start     -> "in 3h 13m"
-//   - If we're inside today's window    -> "ends in 1h 57m"
-//   - If we're after today's end        -> "in 19h 31m (tomorrow)"
+// Time text depends on where "now" falls relative to the class window:
+//   - before today's start     -> "in 3h 13m"           (same day)
+//   - inside today's window    -> "ends in 1h 45m"      (countdown to end)
+//   - after today's end        -> "in 19h 31m (tomorrow)" (next day)
 //
-// The wording around the time is per-status so the dean knows what action
-// to take (or what the system is doing automatically).
+// The status-specific prefix tells the dean what is happening:
+//   - pending + before start   -> "Class starts in 3h 13m"
+//   - pending + inside window  -> "In progress — ends in 1h 45m"
+//   - pending + after end      -> "Class starts in 19h 31m (tomorrow)"
+//   - waiting + before start   -> "Auto-approve in 53 min"
+//   - waiting + inside window  -> "Auto-approve now" (or "in progress")
+//   - waiting + after end      -> "Auto-approve in 19h 31m (tomorrow)"
+//   - approved + inside window -> "Class ends in 1h 57m"
+//   - approved + after end     -> "Next class in 19h 31m (tomorrow)"
 function hintFor(row: AllocationRow, now: Date): string | null {
   const live = liveOf(row, now)
   const startMs = timeToMs(row.start_time)
@@ -69,8 +76,6 @@ function hintFor(row: AllocationRow, now: Date): string | null {
   const dayMs = 24 * 3600_000
 
   // Where are we in the day vs. the class window?
-  // beforeStart, inside, afterEnd, plus a flag for whether the next
-  // occurrence is on the same day or "tomorrow" (next day).
   let diff: number
   let tomorrow = false
   if (nowMs < startMs) {
@@ -83,13 +88,24 @@ function hintFor(row: AllocationRow, now: Date): string | null {
   }
 
   const countdown = fmtCountdown(diff)
-  const when = countdown ? `in ${countdown}${tomorrow ? " (tomorrow)" : ""}` : "now"
+  const inText = countdown ? `in ${countdown}` : "now"
+  const when = tomorrow ? `${inText} (tomorrow)` : inText
 
+  // Inside the window: class is currently happening, so always show
+  // "in progress" and a countdown to end — regardless of stored status.
+  if (nowMs >= startMs && nowMs <= endMs) {
+    if (live === "approved") return `Class ends ${when}`
+    if (live === "waiting") return `In progress — auto-approved, ends ${when}`
+    // live === "pending"
+    return `In progress — ends ${when}`
+  }
+
+  // Outside the window: depends on stored status.
   if (live === "pending") return `Class starts ${when}`
   if (live === "waiting") return `Auto-approve ${when}`
-  // live === "approved"
-  if (nowMs > endMs) return `Next class ${when}`
-  return `Class ends ${when}`
+  // live === "approved" but past end (only reachable from approved when
+  // the time just slipped past the window).
+  return `Next class ${when}`
 }
 
 function StatusBadge({ status, onClick, busy }: { status: AllocationStatus; onClick?: () => void; busy?: boolean }) {
