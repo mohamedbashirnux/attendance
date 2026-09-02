@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { verifyTeacherToken, corsHeaders } from "@/lib/teacher-api/auth"
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
 }
 
+// Same values as the `absences.excuse` column enum in MySQL.
+// If you change the enum in the DB, update this list too.
+const EXCUSES = [
+  "Family Emergency",
+  "Medical Appointment",
+  "Personal Reason",
+  "Official Duty",
+  "Other",
+  "No Excuse",
+]
+
 /**
  * GET /api/teacher/excuses
  *
  * Returns the list of valid excuse values for the `absences` table.
- * The mobile app calls this once at startup (or when the excuse
- * dropdown is first opened) to populate the dropdown without
- * hardcoding the values. The list is read from the Prisma client's
- * enum, so it always matches the DB schema.
+ * The mobile app calls this to populate the excuse dropdown without
+ * hardcoding the values.
  */
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization")
@@ -33,31 +41,8 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // Prisma's generated client exposes each enum as a frozen object
-  // keyed by the TS member name (e.g. "Medical_Appointment"). The
-  // values are the DB-mapped strings (e.g. "Medical Appointment").
-  const excuseEnum = (prisma as any).absences_excuse as Record<string, string> | undefined
-  if (!excuseEnum) {
-    return NextResponse.json(
-      { error: "Excuse enum not available" },
-      { status: 500, headers: corsHeaders }
-    )
-  }
-
-  // Keep the order user-friendly: leave "No Excuse" at the bottom so
-  // the default isn't the first thing the teacher sees.
-  const ordered = [
-    "Family Emergency",
-    "Medical Appointment",
-    "Personal Reason",
-    "Official Duty",
-    "Other",
-    "No Excuse",
-  ]
-  const values = ordered.filter((v) => Object.values(excuseEnum).includes(v))
-
   return NextResponse.json(
-    { excuses: values },
+    { excuses: EXCUSES },
     { status: 200, headers: corsHeaders }
   )
 }

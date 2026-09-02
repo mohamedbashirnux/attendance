@@ -247,11 +247,10 @@ export async function POST(req: NextRequest) {
             subject_class_id: subjectClassId,
             attendance_session_id: session.id,
             absence_date: absenceDateOnly,
-            // When excuse is null we omit the field so the DB default
-            // "No_Excuse" is used. When set, the value must be one of
-            // the absences_excuse enum members — anything else makes
-            // Prisma throw and the whole transaction rolls back.
-            ...(e.excuse ? { excuse: e.excuse as any } : {}),
+            // excuse is one of the `absences_excuse` enum values from
+            // the `absences` table column. Anything else makes the DB
+            // throw and the whole transaction rolls back.
+            excuse: (e.excuse ?? "No Excuse") as any,
           })),
         })
       }
