@@ -43,6 +43,7 @@ import {
 import { createStudent } from "@/lib/backend_faculty_user/student/add"
 import { updateStudent } from "@/lib/backend_faculty_user/student/edit"
 import { deleteStudent } from "@/lib/backend_faculty_user/student/delete"
+import { setClassStudentsStatus } from "@/lib/backend_faculty_user/student/status"
 
 const STATUS_OPTIONS = [
   { value: "approved", label: "Approved" },
@@ -70,6 +71,8 @@ export function StudentManager({
 
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleting, setDeleting] = React.useState<StudentRow | null>(null)
+  const [markAllBusy, setMarkAllBusy] = React.useState(false)
+  const [pageError, setPageError] = React.useState<string | null>(null)
 
   const currentClass = classId
     ? classes.find((c) => c.id === classId)
@@ -122,6 +125,28 @@ export function StudentManager({
     router.refresh()
   }
 
+  // Toggle button: if every student in the current class is "approved",
+  // the next click sets them all to "pending", and vice versa. If the
+  // class is mixed, the next click sets everyone to "approved".
+  const markAllTarget: "approved" | "pending" = (() => {
+    if (initialData.length === 0) return "approved"
+    const allApproved = initialData.every((s) => s.status === "approved")
+    return allApproved ? "pending" : "approved"
+  })()
+
+  async function handleMarkAll() {
+    if (!classId) return
+    setMarkAllBusy(true)
+    setPageError(null)
+    const res = await setClassStudentsStatus(classId, markAllTarget)
+    setMarkAllBusy(false)
+    if (res && "error" in res) {
+      setPageError(res.error ?? "Could not update students")
+      return
+    }
+    router.refresh()
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -139,11 +164,33 @@ export function StudentManager({
           <Link href="/faculty_user/student/selection">
             <Button variant="outline">Change Class</Button>
           </Link>
+          {classId ? (
+            <Button
+              variant="outline"
+              onClick={handleMarkAll}
+              disabled={markAllBusy || initialData.length === 0}
+              title={
+                markAllTarget === "pending"
+                  ? "Set all students in this class to pending"
+                  : "Set all students in this class to approved"
+              }
+            >
+              {markAllBusy
+                ? "Updating…"
+                : markAllTarget === "pending"
+                ? "Mark All Pending"
+                : "Mark All Approved"}
+            </Button>
+          ) : null}
           <Button onClick={openAdd}>
             {editing ? "Edit Student" : "Add Student"}
           </Button>
         </div>
       </div>
+
+      {pageError ? (
+        <p className="text-sm text-destructive">{pageError}</p>
+      ) : null}
 
       <StudentTable data={initialData} onEdit={openEdit} onDelete={openDelete} />
 
