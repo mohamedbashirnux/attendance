@@ -21,8 +21,9 @@ export type AllocationStatus = "pending" | "waiting" | "approved"
  *  - "waiting"  + outside the window      -> "waiting" (dean allowed,
  *                 waiting for the window to open).
  *  - "approved" + inside the window      -> "approved".
- *  - "approved" + outside (past)         -> "pending" (session ended,
- *                 the dean must re-allow for the next session).
+ *  - "approved" + outside the window     -> "pending" (window hasn't
+ *                 started yet OR has already ended — the dean must
+ *                 re-allow for the next session).
  *
  * After a successful attendance submission the API resets the stored
  * status to "pending", so even if the time is still inside the window
@@ -47,8 +48,11 @@ export function computeLiveStatus(
   if (stored === "waiting") {
     return inside ? "approved" : "waiting"
   }
-  // stored === "approved"
-  return nowMs <= endMs ? "approved" : "pending"
+  // stored === "approved" — only stays "approved" while we are INSIDE
+  // the window. If the window hasn't started yet, or has already ended,
+  // the live status falls back to "pending" so the dean has to re-allow
+  // before the teacher can take attendance.
+  return inside ? "approved" : "pending"
 }
 
 /**
