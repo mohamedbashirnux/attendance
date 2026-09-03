@@ -129,6 +129,36 @@ export async function POST(req: NextRequest) {
     toTimeString(allocation.end_time)
   )
   if (liveStatus !== "approved") {
+    // If the live status is "pending" and there is already a session for
+    // this subject_class today, the teacher submitted attendance and the
+    // allocation was reset to "pending" to lock out a second submission
+    // for the same session. Tell them clearly instead of returning the
+    // generic "not approved" message.
+    if (allocation.status === "pending") {
+      const now = new Date()
+      const dayStart = new Date(
+        Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+      )
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+      const existingToday = await prisma.attendance_sessions.findFirst({
+        where: {
+          subject_class_id: subjectClassId,
+          session_datetime: { gte: dayStart, lt: dayEnd },
+        },
+        select: { id: true, session_datetime: true },
+      })
+      if (existingToday) {
+        return NextResponse.json(
+          {
+            error: `You already submitted attendance for this class today (session id ${existingToday.id} at ${existingToday.session_datetime.toISOString()}). The class is now locked. Please ask the faculty user to re-allow it if a second session is needed.`,
+            already_submitted: true,
+            session_id: existingToday.id,
+            session_datetime: existingToday.session_datetime.toISOString(),
+          },
+          { status: 409, headers: corsHeaders }
+        )
+      }
+    }
     return NextResponse.json(
       {
         error: `This allocation is not approved right now (current status: ${allocation.status}, live: ${liveStatus}). You can only take attendance when the class is approved and inside its time window.`,
