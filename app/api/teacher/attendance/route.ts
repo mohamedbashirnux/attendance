@@ -312,6 +312,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
+        message: `Attendance recorded. ${presentCount} present, ${absentCount} absent.`,
         session_id: result.id,
         session_datetime: result.session_datetime.toISOString(),
         total_students: totalStudents,
