@@ -200,6 +200,7 @@ export async function GET(req: NextRequest) {
       : 0
   const neverAttendedCount = studentReports.filter((s) => s.never_attended).length
 
+  // Debug dump of one student's absent_dates (dev only) - removed after debugging
   return NextResponse.json(
     {
       class_id: sc.subject_class.classes.id,
