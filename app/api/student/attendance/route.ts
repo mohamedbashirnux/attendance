@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
         absent_students: true,
         attendance_percentage: true,
         notes: true,
+        teachers: { select: { id: true, full_name: true, teacher_id: true } },
       },
       orderBy: { session_datetime: "desc" },
     }),
@@ -184,6 +185,9 @@ export async function GET(req: NextRequest) {
       excuse: abs ? abs.excuse : null,
       absence_date: abs ? abs.date : null,
       notes: s.notes,
+      teacher_id: s.teachers?.id ?? null,
+      teacher_code: s.teachers?.teacher_id ?? null,
+      teacher_name: s.teachers?.full_name ?? null,
     }
   })
 
