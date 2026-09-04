@@ -75,7 +75,6 @@ model classes {
   academic_year     String              @db.VarChar(9)
   created_at        DateTime            @default(now()) @db.Timestamp(0)
   departments       departments         @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "classes_ibfk_2")
-  lesson_materials  lesson_materials[]
   notification_logs notification_logs[]
   students          students[]
   subject_class     subject_class[]
@@ -127,28 +126,6 @@ model faculty_users {
   @@index([faculty_id], map: "faculty_id")
 }
 
-model lesson_materials {
-  id          Int                      @id @default(autoincrement())
-  teacher_id  Int
-  class_id    Int
-  subject_id  Int
-  title       String                   @db.VarChar(255)
-  description String?                  @db.Text
-  file_path   String                   @db.VarChar(500)
-  file_name   String                   @db.VarChar(255)
-  file_size   Int?
-  upload_date DateTime                 @default(now()) @db.Timestamp(0)
-  status      lesson_materials_status? @default(active)
-  classes     classes                  @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "fk_lesson_class")
-  subjects    subjects                 @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "fk_lesson_subject")
-  teachers    teachers                 @relation(fields: [teacher_id], references: [id], onDelete: Cascade, map: "fk_lesson_teacher")
-
-  @@index([class_id], map: "idx_class_id")
-  @@index([status], map: "idx_status")
-  @@index([subject_id], map: "idx_subject_id")
-  @@index([teacher_id], map: "idx_teacher_id")
-}
-
 model notification_logs {
   id           Int      @id @default(autoincrement())
   class_id     Int
@@ -195,13 +172,12 @@ model subject_class {
 }
 
 model subjects {
-  id               Int                @id @default(autoincrement())
-  department_id    Int
-  subject_name     String             @db.VarChar(100)
-  created_at       DateTime           @default(now()) @db.Timestamp(0)
-  lesson_materials lesson_materials[]
-  subject_class    subject_class[]
-  departments      departments        @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "subjects_ibfk_2")
+  id            Int             @id @default(autoincrement())
+  department_id Int
+  subject_name  String          @db.VarChar(100)
+  created_at    DateTime        @default(now()) @db.Timestamp(0)
+  subject_class subject_class[]
+  departments   departments     @relation(fields: [department_id], references: [id], onDelete: Cascade, map: "subjects_ibfk_2")
 
   @@index([department_id], map: "department_id")
 }
@@ -241,7 +217,6 @@ model teachers {
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
   updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
   attendance_sessions        attendance_sessions[]
-  lesson_materials           lesson_materials[]
   teacher_subject_allocation teacher_subject_allocation[]
   faculty                    faculty                      @relation(fields: [faculty_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "teachers_ibfk_1")
 
@@ -320,9 +295,4 @@ enum teacher_subject_allocation_status {
   pending
   waiting
   approved
-}
-
-enum lesson_materials_status {
-  active
-  archived
 }
