@@ -12,6 +12,7 @@ import {
   UserPlus,
   BookUser,
   CalendarOff,
+  CalendarDays,
   Users,
 } from "lucide-react"
 import {
@@ -55,6 +56,12 @@ const navMain = [
     title: "Manage Absents",
     items: [
       { title: "Absents", url: "/faculty_user/absents/selection", icon: CalendarOff },
+    ],
+  },
+  {
+    title: "Schedule",
+    items: [
+      { title: "Time Table", url: "/faculty_user/timetable/selection", icon: CalendarDays },
     ],
   },
 ]
