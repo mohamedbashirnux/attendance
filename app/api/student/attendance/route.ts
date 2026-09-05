@@ -106,6 +106,7 @@ export async function GET(req: NextRequest) {
         attendance_session_id: true,
         absence_date: true,
         excuse: true,
+        created_at: true,
       },
       orderBy: { absence_date: "desc" },
     }),
@@ -113,7 +114,10 @@ export async function GET(req: NextRequest) {
 
   // 4. Build a set of session_ids the student was absent from, and
   //    a map from session_id -> excuse.
-  const absentBySession = new Map<number, { excuse: string; date: string }>()
+  const absentBySession = new Map<
+    number,
+    { excuse: string; date: string; createdAt: string | null }
+  >()
   for (const a of absences) {
     absentBySession.set(a.attendance_session_id, {
       excuse: excuseLabel(a.excuse),
@@ -121,6 +125,12 @@ export async function GET(req: NextRequest) {
         a.absence_date instanceof Date
           ? a.absence_date.toISOString().slice(0, 10)
           : String(a.absence_date).slice(0, 10),
+      createdAt:
+        a.created_at instanceof Date
+          ? a.created_at.toISOString()
+          : a.created_at
+            ? String(a.created_at)
+            : null,
     })
   }
 
@@ -184,6 +194,10 @@ export async function GET(req: NextRequest) {
       was_absent: !!abs,
       excuse: abs ? abs.excuse : null,
       absence_date: abs ? abs.date : null,
+      // The exact moment the teacher recorded this absence (server
+      // timestamp, not class time). Lets the student see when the
+      // teacher actually marked them absent.
+      absence_created_at: abs ? abs.createdAt : null,
       notes: s.notes,
       teacher_id: s.teachers?.id ?? null,
       teacher_code: s.teachers?.teacher_id ?? null,
