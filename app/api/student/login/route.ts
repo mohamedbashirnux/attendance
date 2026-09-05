@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Your account is pending approval. Please contact the faculty user to approve your account before logging in.",
+          "Your account is pending approval. Please contact your faculty to approve your account before logging in.",
         status: student.status ?? "pending",
       },
       { status: 403, headers: corsHeaders }
