@@ -146,10 +146,18 @@ export async function GET(req: NextRequest) {
     Sunday: [],
   }
 
+  // Normalize day_of_week to title case so the byDay map keys are
+  // always "Monday".."Sunday" regardless of how the DB stores them
+  // (e.g. "monday" / "Monday" / "MONDAY" all map to "Monday").
+  function titleCase(s: string): string {
+    if (!s) return s
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  }
+
   const list: Entry[] = rows.map((r) => ({
     id: r.timetable_id,
     allocation_id: r.allocation_id,
-    day_of_week: r.day_of_week,
+    day_of_week: titleCase(r.day_of_week),
     time_start: shortTime(r.start_time),
     time_end: shortTime(r.end_time),
     location_hall: r.location_hall,
