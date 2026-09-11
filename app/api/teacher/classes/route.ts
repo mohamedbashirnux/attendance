@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
 
   const classes = teacher.teacher_subject_allocation.map((a) => ({
     allocation_id: a.id,
+    subject_class_id: a.subject_class_id,
     class_id: a.subject_class.classes.id,
     class_name: a.subject_class.classes.class_name,
     department_name: a.subject_class.classes.departments.department_name,

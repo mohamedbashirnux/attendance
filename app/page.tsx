@@ -9,50 +9,58 @@ import {
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center bg-muted/30 p-6">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex flex-col items-center text-center">
+    <main className="relative flex min-h-svh w-full items-center justify-center overflow-hidden bg-[#fafafa] px-6 py-12">
+      <div className="absolute inset-x-0 top-0 h-1 bg-[#5F61E6]" />
+      <div className="w-full max-w-lg">
+        <div className="mb-10 flex flex-col items-center text-center">
           <img
             src="/images/logo1.png"
-            alt="Logo"
-            className="mb-3 size-14 rounded-xl object-contain"
+            alt="Capital University"
+            className="mb-5 size-16 rounded-2xl border border-border/70 bg-white p-2 object-contain shadow-sm"
           />
-          <h1 className="text-2xl font-semibold">Attendance</h1>
-          <p className="text-sm text-muted-foreground">
-            Select how you want to log in
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#5F61E6]">
+            Capital University
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            Attendance portal
+          </h1>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+            Choose the account type you want to use to continue.
           </p>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           <Link href="/faculty/login" className="group block">
-            <Card className="cursor-pointer transition-all hover:-translate-y-0.5 hover:border-[#5F61E6] hover:bg-[#5F61E6]/5 hover:shadow-md">
-              <CardHeader className="flex-row items-center gap-3 space-y-0">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-[#5F61E6]/10 text-[#5F61E6]">
+            <Card className="cursor-pointer border-border/70 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#5F61E6]/50 hover:shadow-md">
+              <CardHeader className="flex-row items-center gap-4 space-y-0 p-5">
+                <div className="flex size-11 items-center justify-center rounded-xl bg-[#5F61E6]/10 text-[#5F61E6]">
                   <UserRound className="size-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <CardTitle className="text-base">Login as User</CardTitle>
-                  <CardDescription>Faculty member access</CardDescription>
+                  <CardDescription className="mt-1">Faculty member access</CardDescription>
                 </div>
+                <span className="ml-auto text-lg text-muted-foreground transition-transform group-hover:translate-x-1">→</span>
               </CardHeader>
             </Card>
           </Link>
 
           <Link href="/login" className="group block">
-            <Card className="cursor-pointer transition-all hover:-translate-y-0.5 hover:border-[#5F61E6] hover:bg-[#5F61E6]/5 hover:shadow-md">
-              <CardHeader className="flex-row items-center gap-3 space-y-0">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-[#5F61E6]/10 text-[#5F61E6]">
+            <Card className="cursor-pointer border-border/70 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#5F61E6]/50 hover:shadow-md">
+              <CardHeader className="flex-row items-center gap-4 space-y-0 p-5">
+                <div className="flex size-11 items-center justify-center rounded-xl bg-[#5F61E6]/10 text-[#5F61E6]">
                   <ShieldCheck className="size-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <CardTitle className="text-base">Login as Admin</CardTitle>
-                  <CardDescription>Super admin access</CardDescription>
+                  <CardDescription className="mt-1">Super admin access</CardDescription>
                 </div>
+                <span className="ml-auto text-lg text-muted-foreground transition-transform group-hover:translate-x-1">→</span>
               </CardHeader>
             </Card>
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

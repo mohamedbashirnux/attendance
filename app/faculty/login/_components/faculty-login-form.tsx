@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/select"
 import type { FacultyRow } from "@/lib/types"
 import { facultyLoginAction } from "@/lib/backend_faculty_user/auth/login"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 
 type State = { errors?: Record<string, string[]>; error?: string }
 
@@ -41,15 +43,19 @@ export function FacultyLoginForm({
   )
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle>Faculty Login</CardTitle>
-          <CardDescription>
+    <div className={cn("flex flex-col gap-5", className)} {...props}>
+      <Link href="/" className="inline-flex w-fit items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <ArrowLeft className="size-4" />
+        Back to account selection
+      </Link>
+      <Card className="border-border/70 bg-white shadow-sm">
+        <CardHeader className="p-6 pb-2">
+          <CardTitle className="text-xl">Faculty login</CardTitle>
+          <CardDescription className="mt-1">
             Select your faculty, then enter your username and password
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 pt-4">
           <form action={formAction}>
             <FieldGroup>
               <Field>

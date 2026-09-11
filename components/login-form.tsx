@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/card"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { loginAction } from "@/lib/backend_super_admin/auth/login"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 
 type State = { errors?: Record<string, string[]>; error?: string }
 
@@ -31,15 +32,19 @@ export function LoginForm({
   )
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
-          <CardDescription>
+    <div className={cn("flex flex-col gap-5", className)} {...props}>
+      <Link href="/" className="inline-flex w-fit items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <ArrowLeft className="size-4" />
+        Back to account selection
+      </Link>
+      <Card className="border-border/70 bg-white shadow-sm">
+        <CardHeader className="p-6 pb-2">
+          <CardTitle className="text-xl">Admin login</CardTitle>
+          <CardDescription className="mt-1">
             Enter your username and password to login
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 pt-4">
           <form action={formAction}>
             <FieldGroup>
               <Field>
@@ -80,12 +85,6 @@ export function LoginForm({
                 <Button type="submit" disabled={pending}>
                   {pending ? "Logging in..." : "Login"}
                 </Button>
-                <Button variant="outline" type="button">
-                  Login with Google
-                </Button>
-                <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
-                </FieldDescription>
               </Field>
             </FieldGroup>
           </form>

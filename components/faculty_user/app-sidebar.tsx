@@ -75,34 +75,40 @@ export function AppSidebar({
     pathname === url || pathname.startsWith(url + "/")
 
   return (
-    <Sidebar {...props}>
-      <SidebarHeader>
+    <Sidebar {...props} className="border-r border-border/70 bg-white">
+      <SidebarHeader className="border-b border-border/70 px-4 py-5">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
+              className="h-auto gap-3 p-0 hover:bg-transparent"
               render={<a href="/faculty_user" />}
             >
               <img
                 src="/images/logo1.png"
-                alt="Logo"
-                className="size-8 rounded-lg object-contain"
+                alt="Capital University"
+                className="size-9 rounded-xl border border-border/70 object-contain p-1"
               />
+              <span className="flex flex-col items-start gap-0.5 group-data-[collapsible=icon]:hidden">
+                <span className="text-sm font-semibold tracking-tight">Attendance</span>
+                <span className="text-[11px] text-muted-foreground">Faculty portal</span>
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="px-3 py-4">
           <SidebarMenu className="gap-1">
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={isActive("/faculty_user")}
                 className={
-                  isActive("/faculty_user")
+                  "h-9 font-medium " +
+                  (isActive("/faculty_user")
                     ? "bg-[#5F61E6]/10 text-[#5F61E6] hover:bg-[#5F61E6]/15"
-                    : ""
+                    : "")
                 }
                 render={<a href="/faculty_user" />}
               >
@@ -120,7 +126,7 @@ export function AppSidebar({
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton render={<CollapsibleTrigger />}>
+                    <SidebarMenuButton className="h-8 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground" render={<CollapsibleTrigger />}>
                       {item.title}{" "}
                       <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-aria-expanded/menu-button:rotate-90" />
                     </SidebarMenuButton>
@@ -133,9 +139,10 @@ export function AppSidebar({
                               <SidebarMenuSubButton
                                 isActive={isActive(sub.url)}
                                 className={
-                                  isActive(sub.url)
-                                    ? "bg-[#5F61E6]/10 text-[#5F61E6] hover:bg-[#5F61E6]/15"
-                                    : ""
+                                  "h-8 text-[13px] " +
+                                  (isActive(sub.url)
+                                    ? "bg-[#5F61E6]/10 font-medium text-[#5F61E6] hover:bg-[#5F61E6]/15"
+                                    : "")
                                 }
                                 render={<a href={sub.url} />}
                               >

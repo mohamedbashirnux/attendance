@@ -78,7 +78,6 @@ model classes {
   notification_logs notification_logs[]
   students          students[]
   subject_class     subject_class[]
-  timetable         timetable[]
 
   @@index([department_id], map: "department_id")
 }
@@ -163,6 +162,7 @@ model subject_class {
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
   absences                   absences[]
   attendance_sessions        attendance_sessions[]
+  lesson_materials           lesson_materials[]
   subjects                   subjects                     @relation(fields: [subject_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_2")
   classes                    classes                      @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "subject_class_ibfk_3")
   teacher_subject_allocation teacher_subject_allocation[]
@@ -217,6 +217,7 @@ model teachers {
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
   updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
   attendance_sessions        attendance_sessions[]
+  lesson_materials           lesson_materials[]
   teacher_subject_allocation teacher_subject_allocation[]
   faculty                    faculty                      @relation(fields: [faculty_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "teachers_ibfk_1")
 
@@ -225,20 +226,33 @@ model teachers {
 
 model timetable {
   id                         Int                        @id @default(autoincrement())
-  class_id                   Int
   allocation_id              Int
-  day_of_week                String                     @db.VarChar(20)
-  time_start                 DateTime                   @db.Time(0)
-  time_end                   DateTime                   @db.Time(0)
+  day_of_week                timetable_day_of_week
   location_hall              String?                    @db.VarChar(100)
   created_at                 DateTime                   @default(now()) @db.Timestamp(0)
   updated_at                 DateTime                   @default(now()) @db.Timestamp(0)
   teacher_subject_allocation teacher_subject_allocation @relation(fields: [allocation_id], references: [id], onDelete: Cascade, map: "fk_timetable_allocation")
-  classes                    classes                    @relation(fields: [class_id], references: [id], onDelete: Cascade, map: "fk_timetable_class")
 
   @@index([allocation_id], map: "idx_allocation_id")
-  @@index([class_id], map: "idx_class_id")
-  @@index([day_of_week], map: "idx_day_of_week")
+}
+
+model lesson_materials {
+  id                     Int                     @id @default(autoincrement())
+  subject_class_id       Int
+  title                  String                  @db.VarChar(255)
+  description            String?                 @db.Text
+  file_path              String                  @db.VarChar(500)
+  file_name              String                  @db.VarChar(255)
+  file_size              Int?
+  uploaded_by_teacher_id Int
+  status                 lesson_materials_status @default(active)
+  created_at             DateTime                @default(now()) @db.Timestamp(0)
+  updated_at             DateTime                @default(now()) @db.Timestamp(0)
+  subject_class          subject_class           @relation(fields: [subject_class_id], references: [id], onDelete: Cascade, map: "fk_material_subject_class")
+  teachers               teachers                @relation(fields: [uploaded_by_teacher_id], references: [id], onDelete: Cascade, map: "fk_material_teacher")
+
+  @@index([subject_class_id], map: "idx_subject_class_id")
+  @@index([uploaded_by_teacher_id], map: "idx_uploaded_by_teacher_id")
 }
 
 enum app_feedback_user_type {
@@ -295,4 +309,19 @@ enum teacher_subject_allocation_status {
   pending
   waiting
   approved
+}
+
+enum timetable_day_of_week {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+  Sunday
+}
+
+enum lesson_materials_status {
+  active
+  archived
 }
