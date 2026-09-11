@@ -259,7 +259,7 @@ export function StudentManager({
                   ))}
                 </SelectContent>
               </Select>
-              <input type="hidden" name="class_id" value={pickedClassId} />
+              <input type="hidden" name="class_id" value={pickedClassId ?? ""} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="status">Status</Label>
@@ -282,7 +282,7 @@ export function StudentManager({
                   ))}
                 </SelectContent>
               </Select>
-              <input type="hidden" name="status" value={status} />
+              <input type="hidden" name="status" value={status ?? ""} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">

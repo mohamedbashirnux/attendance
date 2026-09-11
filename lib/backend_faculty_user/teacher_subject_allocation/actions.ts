@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { teacher_subject_allocation_status } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/backend_super_admin/auth/auth"
 
@@ -42,7 +43,7 @@ export async function changeStatus(id: number, newStatus: string) {
   try {
     await prisma.teacher_subject_allocation.update({
       where: { id },
-      data: { status: newStatus },
+      data: { status: newStatus as teacher_subject_allocation_status },
     })
   } catch {
     return { error: "Could not update status" }
